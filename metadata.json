@@ -1,0 +1,6 @@
+{
+  "name": "Data Tycoon: สถิติพิชิตเศรษฐี",
+  "description": "เกมกระดานเศรษฐีเพื่อการเรียนรู้สถิติศาสตร์ภาษาไทย เล่นคนเดียวกับบอท AI หรือเล่นออนไลน์กับเพื่อนผ่านรหัสห้อง",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
