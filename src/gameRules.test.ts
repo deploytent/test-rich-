@@ -10,6 +10,7 @@ import {
   evaluateGameEnd,
   findNextTurn,
   generateRoomCode,
+  getBoardTileCoordinates,
   getDiscountedPrice,
   getSellToBankValue,
   getStepPath,
@@ -20,6 +21,7 @@ import {
   pickRandomAvailableColor,
   pickRandomPlayerName,
   RANDOM_PLAYER_NAMES,
+  stepVisualPosition,
 } from './gameRules';
 import type { GameState, Player, PropertyState, TileConfig } from './types';
 
@@ -325,6 +327,18 @@ test('pickAvailableTokenColor, pickRandomAvailableColor, and changePlayerColorIn
   const allowed = changePlayerColorInRoom(mockRoom, 'p1', 'yellow');
   assert.equal(allowed.changed, true);
   assert.equal(allowed.state.players[0].color, 'yellow');
+});
+
+test('getBoardTileCoordinates maps all 16 perimeter tiles and stepVisualPosition wraps cleanly', () => {
+  assert.deepEqual(getBoardTileCoordinates(1), { row: 0, col: 0, leftPct: 10, topPct: 10 });
+  assert.deepEqual(getBoardTileCoordinates(5), { row: 0, col: 4, leftPct: 90, topPct: 10 });
+  assert.deepEqual(getBoardTileCoordinates(9), { row: 4, col: 4, leftPct: 90, topPct: 90 });
+  assert.deepEqual(getBoardTileCoordinates(13), { row: 4, col: 0, leftPct: 10, topPct: 90 });
+  assert.deepEqual(getBoardTileCoordinates(16), { row: 1, col: 0, leftPct: 10, topPct: 30 });
+
+  assert.equal(stepVisualPosition(1), 2);
+  assert.equal(stepVisualPosition(15), 16);
+  assert.equal(stepVisualPosition(16), 1);
 });
 
 

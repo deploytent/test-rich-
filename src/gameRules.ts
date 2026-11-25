@@ -329,6 +329,48 @@ export function getStepPath(
 }
 
 /**
+ * Compute 5x5 perimeter grid coordinates and percentage center (leftPct, topPct) for tile IDs 1..16.
+ */
+export function getBoardTileCoordinates(tileId: number): {
+  row: number;
+  col: number;
+  leftPct: number;
+  topPct: number;
+} {
+  const clamped = ((Math.max(1, Math.round(tileId)) - 1) % 16) + 1;
+  let row = 0;
+  let col = 0;
+
+  if (clamped >= 1 && clamped <= 5) {
+    row = 0;
+    col = clamped - 1;
+  } else if (clamped >= 6 && clamped <= 9) {
+    row = clamped - 5;
+    col = 4;
+  } else if (clamped >= 10 && clamped <= 13) {
+    row = 4;
+    col = 13 - clamped;
+  } else {
+    row = 17 - clamped;
+    col = 0;
+  }
+
+  return {
+    row,
+    col,
+    leftPct: (col + 0.5) * 20,
+    topPct: (row + 0.5) * 20,
+  };
+}
+
+/**
+ * Advance visual board position forward by exactly 1 tile on the 1..16 loop.
+ */
+export function stepVisualPosition(currentPos: number): number {
+  return (currentPos % 16) + 1;
+}
+
+/**
  * Find next active (non-bankrupt) player index and whether a new round starts.
  */
 export function findNextTurn(

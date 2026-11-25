@@ -425,7 +425,7 @@ export const QuizModal: React.FC<QuizModalProps> = ({
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18 }}
-        className="w-full max-w-xl max-h-[90vh] flex flex-col rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] text-slate-800 shadow-2xl overflow-hidden"
+        className="w-full max-w-xl max-h-[90dvh] flex flex-col rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] text-slate-800 shadow-2xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b-2 border-[#E6D7B9] px-5 py-3.5 bg-[#FFFDF7]">
           <div className="flex items-center gap-2.5 min-w-0">

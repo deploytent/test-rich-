@@ -86,8 +86,8 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
       {/* Main Cream & Gold Top Pill Bar */}
       <div className="rounded-2xl bg-[#FFFDF7] border-2 border-[#F5C542] border-b-4 border-b-[#D49B1A] px-2 min-[380px]:px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-md flex items-center justify-between gap-1.5 sm:gap-2 overflow-visible">
         {/* Left: Compact Logo + Local/Hero Player Cash Pill */}
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 overflow-visible">
-          <div className="hidden md:block shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 overflow-visible">
+          <div className="hidden lg:block shrink-0">
             <MonopolyLogo compact />
           </div>
 
@@ -95,7 +95,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
             const isHeroTurn = heroPlayer.id === currentPlayerId && !heroPlayer.bankrupt;
             return (
               <div
-                className={`relative flex items-center gap-1.5 min-[380px]:gap-2 rounded-xl min-[380px]:rounded-2xl px-2 py-1 border-2 transition-all overflow-visible min-w-0 ${
+                className={`relative flex items-center gap-1.5 min-[380px]:gap-2 rounded-xl min-[380px]:rounded-2xl px-2 py-1 border-2 transition-all overflow-visible shrink-0 ${
                   isHeroTurn
                     ? 'bg-amber-50 border-[#F5C542] shadow-xs'
                     : 'bg-[#FAF6EE] border-[#E6D7B9]'
@@ -209,36 +209,6 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Compact Rivals Strip (390px screens) */}
-      {otherPlayers.length > 0 && (
-        <div className="sm:hidden mt-1.5 flex items-center justify-center gap-1.5 flex-wrap overflow-visible">
-          {otherPlayers.map((p) => {
-            const isActive = p.id === currentPlayerId && !p.bankrupt;
-            return (
-              <div
-                key={p.id}
-                className={`relative flex items-center gap-1 rounded-full px-2 py-0.5 border text-[10px] overflow-visible ${
-                  p.bankrupt
-                    ? 'bg-white/60 border-slate-300 opacity-55'
-                    : isActive
-                      ? 'bg-[#FFFDF7] border-[#F5C542] ring-2 ring-sky-400 shadow-xs'
-                      : 'bg-[#FFFDF7]/95 border-[#E6D7B9]'
-                }`}
-              >
-                <Token3D color={p.color} size="xs" />
-                <span className="font-extrabold text-slate-800 truncate max-w-[56px]">
-                  {p.name}
-                </span>
-                <span className="font-mono-num font-extrabold text-emerald-700">
-                  ฿{p.cash.toLocaleString()}
-                </span>
-                {renderPopupBadges(p.id)}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* Subtle Online Turn Countdown Progress */}
       {gameState.isOnline && (
         <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/50 overflow-hidden">
@@ -249,6 +219,158 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
         </div>
       )}
     </header>
+  );
+};
+
+interface MobilePlayerGridProps {
+  gameState: GameState;
+  moneyPopups: MoneyPopup[];
+}
+
+export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
+  gameState,
+  moneyPopups,
+}) => {
+  const currentPlayerId = gameState.players[gameState.turnIndex]?.id;
+
+  return (
+    <section
+      aria-label="รายชื่อผู้เล่นและเงินคงเหลือ"
+      className="sm:hidden w-[min(94vw,440px)] mx-auto grid grid-cols-2 gap-1.5 mt-1.5"
+    >
+      {gameState.players.map((p) => {
+        const isActive = p.id === currentPlayerId && !p.bankrupt;
+        const pops = moneyPopups.filter((m) => m.playerId === p.id);
+        return (
+          <div
+            key={p.id}
+            className={`relative flex items-center justify-between gap-1.5 rounded-xl px-2 py-1 border-2 transition-all overflow-visible ${
+              p.bankrupt
+                ? 'bg-white/65 border-slate-300 opacity-55'
+                : isActive
+                  ? 'bg-[#FFFDF7] border-[#F5C542] ring-2 ring-sky-400 shadow-xs'
+                  : 'bg-[#FFFDF7]/95 border-[#E6D7B9]'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Token3D color={p.color} size="xs" />
+              <span className="text-[11px] font-extrabold text-slate-800 truncate">
+                {p.name}
+              </span>
+              {p.inLab && !p.bankrupt && (
+                <FlaskConical className="h-3 w-3 text-indigo-600 shrink-0" />
+              )}
+            </div>
+            <span className="font-mono-num text-[11px] font-extrabold text-emerald-700 shrink-0">
+              {p.bankrupt ? 'ล้มละลาย' : `฿${p.cash.toLocaleString()}`}
+            </span>
+
+            <AnimatePresence>
+              {pops.map((pop) => (
+                <motion.span
+                  key={pop.id}
+                  initial={{ opacity: 0, y: 4, scale: 0.85 }}
+                  animate={{
+                    opacity: [0, 1, 1, 0],
+                    y: [4, -12, -20, -28],
+                    scale: [0.85, 1.1, 1, 0.95],
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 1.6, ease: 'easeOut' }}
+                  className={`absolute -top-4 right-1 whitespace-nowrap font-mono-num text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow border border-white pointer-events-none z-40 ${
+                    pop.amount >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                  }`}
+                >
+                  {pop.amount >= 0
+                    ? `+฿${pop.amount.toLocaleString()}`
+                    : `-฿${Math.abs(pop.amount).toLocaleString()}`}
+                </motion.span>
+              ))}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </section>
+  );
+};
+
+interface DesktopSidePanelProps {
+  gameState: GameState;
+  tiles: TileConfig[];
+}
+
+export const DesktopSidePanel: React.FC<DesktopSidePanelProps> = ({
+  gameState,
+  tiles,
+}) => {
+  const currentPlayerId = gameState.players[gameState.turnIndex]?.id;
+
+  return (
+    <aside
+      aria-label="แผงข้อมูลสถิติและอันดับผู้เล่น"
+      className="hidden lg:flex flex-col gap-2.5 w-[335px] xl:w-[375px] shrink-0 max-h-[calc(100dvh-165px)] overflow-y-auto custom-scrollbar pr-0.5"
+    >
+      {/* Compact Live Players Card */}
+      <div className="rounded-2xl border-2 border-[#F5C542] border-b-4 bg-[#FFFDF7] p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5">
+            <Users className="h-4 w-4 text-rose-500" />
+            <h2 className="text-xs xl:text-sm font-extrabold text-slate-900">
+              สถานะผู้เล่น
+            </h2>
+          </div>
+          <span className="rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 font-mono-num text-[11px] font-extrabold text-amber-800">
+            รอบ {Math.min(gameState.currentRound, gameState.maxRounds)}/{gameState.maxRounds}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          {gameState.players.map((p) => {
+            const isActive = p.id === currentPlayerId && !p.bankrupt;
+            const netWorth = calculateNetWorth(p, tiles, gameState.properties);
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 transition-all ${
+                  p.bankrupt
+                    ? 'bg-slate-100 border-slate-200 opacity-55'
+                    : isActive
+                      ? 'bg-amber-50 border-[#F5C542] shadow-xs'
+                      : 'bg-[#FAF6EE] border-[#E6D7B9]'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Token3D color={p.color} size="xs" />
+                  <div className="min-w-0 leading-tight">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-extrabold text-slate-900 truncate max-w-[115px]">
+                        {p.name}
+                      </span>
+                      {p.inLab && !p.bankrupt && (
+                        <FlaskConical className="h-3 w-3 text-indigo-600 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[10px] font-semibold text-slate-500">
+                      คำถาม {p.quizCorrect}/{p.quizTotal} · สุทธิ ฿{netWorth.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <span className="font-mono-num text-xs font-extrabold text-emerald-700 shrink-0">
+                  {p.bankrupt ? 'ล้มละลาย' : `฿${p.cash.toLocaleString()}`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Live Frequency Tracker */}
+      <FrequencyTracker
+        diceCounts={gameState.diceCounts}
+        currentRound={gameState.currentRound}
+        lastDice={gameState.lastDice}
+      />
+    </aside>
   );
 };
 
@@ -278,7 +400,7 @@ export const BottomMonopolyDock: React.FC<BottomMonopolyDockProps> = ({
   return (
     <nav
       aria-label="แถบคำสั่งเกม"
-      className="w-full max-w-3xl mx-auto px-1.5 min-[380px]:px-2 sm:px-4 pb-2.5 min-[380px]:pb-3 sm:pb-5 pt-2 relative"
+      className="w-full max-w-3xl mx-auto px-1.5 min-[380px]:px-2 sm:px-4 pb-2 min-[380px]:pb-2.5 sm:pb-3.5 pt-1.5 relative shrink-0"
     >
       {/* Cream & Gold Menu Bar flanking the Hero Diamond GO Button */}
       <div className="relative rounded-2xl bg-[#FAF6EE] border-2 border-[#F5C542] border-b-[5px] border-b-[#D49B1A] px-1 min-[380px]:px-2 sm:px-4 py-1.5 sm:py-2 shadow-lg grid grid-cols-5 items-center gap-0.5 min-[380px]:gap-1 sm:gap-2">
@@ -420,7 +542,7 @@ export const PlayerStatsModal: React.FC<{
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] shadow-2xl overflow-hidden text-slate-800"
+        className="w-full max-w-xl max-h-[88dvh] flex flex-col rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] shadow-2xl overflow-hidden text-slate-800"
       >
         <div className="flex items-center justify-between border-b-2 border-[#E6D7B9] px-5 py-4 bg-[#FFFDF7]">
           <div className="flex items-center gap-2">

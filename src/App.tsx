@@ -4,6 +4,7 @@ import { ScrollText, X } from 'lucide-react';
 import { isFirebaseConfigured, rtdb } from './firebaseConfig';
 import { getBoardTiles, pickQuizQuestionWithHistory, pickUpgradeChallenge } from './gameData';
 import {
+  advanceBoardPosition,
   ALL_TOKEN_COLORS,
   calculateRent,
   changePlayerColorInRoom,
@@ -15,7 +16,6 @@ import {
   generateRoomCode,
   getModeLabel,
   getSellToBankValue,
-  getStepPath,
   getTakeoverCost,
   LAB_BAIL_COST,
   MODE_BONUS_AMOUNT,
@@ -26,6 +26,7 @@ import {
   QUIZ_REWARD,
   START_PASS_BONUS,
   STARTING_CASH,
+  stepVisualPosition,
   TAX_AMOUNT,
   WARP_COST,
 } from './gameRules';
@@ -58,7 +59,9 @@ import { Lobby } from './components/Lobby';
 import { Board } from './components/Board';
 import {
   BottomMonopolyDock,
+  DesktopSidePanel,
   FrequencyModal,
+  MobilePlayerGrid,
   PlayerStatsModal,
   TopMonopolyBar,
 } from './components/MonopolyHud';
@@ -169,6 +172,7 @@ export default function App() {
   const [muted, setMuted] = useState<boolean>(false);
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>(1);
   const [moneyPopups, setMoneyPopups] = useState<MoneyPopup[]>([]);
+  const [visualPositions, setVisualPositions] = useState<Record<string, number>>({});
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const [lastSoloConfig, setLastSoloConfig] = useState<{
     botCount: 1 | 2 | 3;
@@ -179,6 +183,13 @@ export default function App() {
   const botTimerRef = useRef<number | null>(null);
   const turnTimersRef = useRef<number[]>([]);
   const isSteppingRef = useRef<boolean>(false);
+  const movingContextRef = useRef<{
+    playerId: string;
+    playerIndex: number;
+    roll: number;
+    targetPos: number;
+    landingTriggered: boolean;
+  } | null>(null);
   const stateRef = useRef<GameState | null>(null);
   stateRef.current = gameState;
   const gameSpeedRef = useRef<GameSpeed>(1);
@@ -189,6 +200,7 @@ export default function App() {
     turnTimersRef.current.forEach((id) => window.clearTimeout(id));
     turnTimersRef.current = [];
     isSteppingRef.current = false;
+    movingContextRef.current = null;
   }, []);
 
   const scheduleTurnTimer = useCallback((fn: () => void, ms: number) => {
@@ -1033,11 +1045,6 @@ export default function App() {
         rollingPlayer.isBot ? BOT_DELAYS.ROLL_MS : 1250,
         gameSpeedRef.current
       );
-      const stepDelay = getScaledDelay(BOT_DELAYS.STEP_MS, gameSpeedRef.current);
-      const landPause = getScaledDelay(
-        rollingPlayer.isBot ? BOT_DELAYS.LAND_PAUSE_MS : 750,
-        gameSpeedRef.current
-      );
 
       scheduleTurnTimer(() => {
         const latest = stateRef.current;
@@ -1109,7 +1116,31 @@ export default function App() {
           }
         }
 
+        const { newPos, passedStart } = advanceBoardPosition(p.position, roll);
+        p.position = newPos;
+
+        if (passedStart) {
+          p.cash += START_PASS_BONUS;
+          soundFx.playGain();
+          logs = prependLog(
+            logs,
+            makeLog(
+              latest.currentRound,
+              `${p.name} ผ่านจุดเริ่มต้น รับทุนวิจัย +฿${START_PASS_BONUS.toLocaleString()}`,
+              'gain'
+            )
+          );
+        }
+
         players[idx] = p;
+        movingContextRef.current = {
+          playerId: p.id,
+          playerIndex: idx,
+          roll,
+          targetPos: newPos,
+          landingTriggered: false,
+        };
+
         const startMovingState: GameState = {
           ...latest,
           players,
@@ -1117,71 +1148,111 @@ export default function App() {
           speechMessage: speech,
           phase: 'MOVING',
         };
-        setGameState(startMovingState);
-
-        const stepPath = getStepPath(p.position, roll);
-        const stateTiles = getBoardTiles(latest.curriculumMode);
-
-        stepPath.forEach((step, stepIdx) => {
-          scheduleTurnTimer(() => {
-            const cur = stateRef.current;
-            if (!cur || cur.status !== 'playing') {
-              isSteppingRef.current = false;
-              return;
-            }
-            const curPlayers = [...cur.players];
-            const mover = { ...curPlayers[idx] };
-            let curLogs = [...cur.logs];
-            let curSpeech = cur.speechMessage;
-
-            mover.position = step.pos;
-            soundFx.playStep(stepIdx);
-
-            if (step.passedStart) {
-              mover.cash += START_PASS_BONUS;
-              soundFx.playGain();
-              curLogs = prependLog(
-                curLogs,
-                makeLog(
-                  cur.currentRound,
-                  `${mover.name} ผ่านจุดเริ่มต้น รับทุนวิจัย +฿${START_PASS_BONUS.toLocaleString()}`,
-                  'gain'
-                )
-              );
-            }
-
-            const isFinalStep = stepIdx === stepPath.length - 1;
-            if (isFinalStep) {
-              const destTile = stateTiles.find((t) => t.id === step.pos);
-              if (destTile) {
-                curSpeech = `${mover.name} เดินถึงช่อง ${destTile.shortName}`;
-              }
-            }
-
-            curPlayers[idx] = mover;
-            setGameState({
-              ...cur,
-              players: curPlayers,
-              logs: curLogs,
-              speechMessage: curSpeech,
-              phase: 'MOVING',
-            });
-
-            if (isFinalStep) {
-              scheduleTurnTimer(() => {
-                const postMove = stateRef.current;
-                isSteppingRef.current = false;
-                if (!postMove || postMove.status !== 'playing') return;
-                const resolved = resolveLandingTile(postMove, idx, roll);
-                commitState(resolved);
-              }, landPause);
-            }
-          }, stepIdx * stepDelay);
-        });
+        commitState(startMovingState);
       }, rollDelay);
     },
-    [advanceTurnAndCheckEnd, clearTurnTimers, commitState, resolveLandingTile, scheduleTurnTimer]
+    [advanceTurnAndCheckEnd, clearTurnTimers, commitState, scheduleTurnTimer]
   );
+
+  // Sync visualPositions smoothly step-by-step during MOVING, or immediately when stationary
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'playing') {
+      setVisualPositions({});
+      return;
+    }
+
+    if (gameState.phase !== 'MOVING') {
+      setVisualPositions((prev) => {
+        const next: Record<string, number> = {};
+        let changed = Object.keys(prev).length !== gameState.players.length;
+        for (const p of gameState.players) {
+          next[p.id] = p.position;
+          if (prev[p.id] !== p.position) changed = true;
+        }
+        return changed ? next : prev;
+      });
+      return;
+    }
+
+    setVisualPositions((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const p of gameState.players) {
+        if (next[p.id] === undefined) {
+          next[p.id] = p.position;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    const stepMs = gameSpeed === 2 ? 150 : 280;
+    const intervalId = window.setInterval(() => {
+      const latest = stateRef.current;
+      if (!latest || latest.status !== 'playing' || latest.phase !== 'MOVING') return;
+      const activeMover = latest.players[latest.turnIndex];
+      if (!activeMover) return;
+
+      setVisualPositions((prev) => {
+        const currentVis = prev[activeMover.id] ?? activeMover.position;
+        if (currentVis === activeMover.position) {
+          return prev;
+        }
+        const nextVis = stepVisualPosition(currentVis);
+        soundFx.playStep();
+        return {
+          ...prev,
+          [activeMover.id]: nextVis,
+        };
+      });
+    }, stepMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [gameState?.status, gameState?.phase, gameState?.turnIndex, gameState?.players, gameSpeed]);
+
+  // Trigger landing tile resolution ONLY after visualPosition arrives at targetPosition
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'playing' || gameState.phase !== 'MOVING') {
+      return;
+    }
+    const ctx = movingContextRef.current;
+    if (!ctx || ctx.landingTriggered) return;
+
+    const currentVis = visualPositions[ctx.playerId];
+    if (currentVis !== ctx.targetPos) return;
+
+    ctx.landingTriggered = true;
+    const destTile = tiles.find((t) => t.id === ctx.targetPos);
+    const activePlayer = gameState.players[ctx.playerIndex];
+    if (destTile && activePlayer) {
+      setGameState((prev) =>
+        prev && prev.phase === 'MOVING'
+          ? { ...prev, speechMessage: `${activePlayer.name} เดินถึงช่อง ${destTile.shortName}` }
+          : prev
+      );
+    }
+
+    const landPause = getScaledDelay(
+      activePlayer?.isBot ? BOT_DELAYS.LAND_PAUSE_MS : 650,
+      gameSpeed
+    );
+    scheduleTurnTimer(() => {
+      const postMove = stateRef.current;
+      isSteppingRef.current = false;
+      movingContextRef.current = null;
+      if (!postMove || postMove.status !== 'playing' || postMove.phase !== 'MOVING') return;
+      const resolved = resolveLandingTile(postMove, ctx.playerIndex, ctx.roll);
+      commitState(resolved);
+    }, landPause);
+  }, [
+    gameState,
+    visualPositions,
+    tiles,
+    gameSpeed,
+    scheduleTurnTimer,
+    resolveLandingTile,
+    commitState,
+  ]);
 
   // ==================== HUMAN INTERACTION HANDLERS ====================
   const currentPlayer = gameState?.players[gameState.turnIndex];
@@ -1668,7 +1739,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-[#A8E6CF] via-[#8AD979] to-[#7BC043] text-slate-800 flex flex-col justify-between overflow-x-hidden">
+    <div className="min-h-[100dvh] lg:h-[100dvh] lg:max-h-[100dvh] bg-gradient-to-b from-[#A8E6CF] via-[#8AD979] to-[#7BC043] text-slate-800 flex flex-col justify-between overflow-x-hidden lg:overflow-y-hidden">
       {/* Monopoly GO! Top Bar: Cream-white pill with Avatar, Banknote Cash, Rivals, and Speed/Mute/Exit */}
       <TopMonopolyBar
         gameState={gameState}
@@ -1689,23 +1760,30 @@ export default function App() {
         }}
       />
 
-      {/* Main Playfield: Centered Cream & Meadow Square Board */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-1.5 min-[380px]:px-2.5 sm:px-6 pt-1.5 pb-4 sm:py-3 flex flex-col items-center justify-center">
-        <Board
-          gameState={gameState}
-          tiles={tiles}
-          isMyTurn={isMyTurn}
-          gameSpeed={gameSpeed}
-          moneyPopups={moneyPopups}
-          canSkipOnlineTurn={canSkipOnlineTurn}
-          secondsLeftToSkip={secondsLeftToSkip}
-          onRollDice={() => executeRollDice(gameState)}
-          onPayLabBail={handlePayLabBail}
-          onSelectWarp={handleSelectWarp}
-          onSkipWarp={handleDeclineAction}
-          onSkipOnlineTurn={handleSkipOnlineTurn}
-          onOpenFrequencyModal={() => setFrequencyModalOpen(true)}
-        />
+      {/* Main Playfield: Responsive Square Board + Desktop Side Stats Panel + Mobile 2x2 Player Strip */}
+      <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto px-1.5 min-[380px]:px-2.5 sm:px-6 pt-1 pb-2 sm:py-2 flex flex-col items-center justify-center">
+        <div className="w-full flex flex-col lg:flex-row items-center justify-center lg:gap-5 xl:gap-7">
+          <Board
+            gameState={gameState}
+            tiles={tiles}
+            visualPositions={visualPositions}
+            isMyTurn={isMyTurn}
+            gameSpeed={gameSpeed}
+            moneyPopups={moneyPopups}
+            canSkipOnlineTurn={canSkipOnlineTurn}
+            secondsLeftToSkip={secondsLeftToSkip}
+            onRollDice={() => executeRollDice(gameState)}
+            onPayLabBail={handlePayLabBail}
+            onSelectWarp={handleSelectWarp}
+            onSkipWarp={handleDeclineAction}
+            onSkipOnlineTurn={handleSkipOnlineTurn}
+            onOpenFrequencyModal={() => setFrequencyModalOpen(true)}
+          />
+
+          <DesktopSidePanel gameState={gameState} tiles={tiles} />
+        </div>
+
+        <MobilePlayerGrid gameState={gameState} moneyPopups={moneyPopups} />
       </main>
 
       {/* Bottom Cream & Gold Menu Bar + Protruding Red-Orange Diamond GO Roll Button */}

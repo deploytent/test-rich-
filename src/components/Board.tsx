@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Crown, FlaskConical, PlaneTakeoff, SkipForward } from 'lucide-react';
 import type { GameState, MoneyPopup, TileConfig } from '../types';
 import { Tile } from './Tile';
-import { computeDiceStats, LAB_BAIL_COST } from '../gameRules';
+import { Token3D } from './Token3D';
+import {
+  COLOR_META,
+  computeDiceStats,
+  getBoardTileCoordinates,
+  LAB_BAIL_COST,
+} from '../gameRules';
 
 interface BoardProps {
   gameState: GameState;
   tiles: TileConfig[];
+  visualPositions: Record<string, number>;
   isMyTurn: boolean;
   gameSpeed?: 1 | 2;
   moneyPopups?: MoneyPopup[];
@@ -19,6 +26,28 @@ interface BoardProps {
   onSkipWarp: () => void;
   onSkipOnlineTurn: () => void;
   onOpenFrequencyModal?: () => void;
+}
+
+function getOverlayStackOffsetPct(index: number, total: number): { dxPct: number; dyPct: number } {
+  if (total <= 1) return { dxPct: 0, dyPct: 0 };
+  if (total === 2) {
+    return index === 0 ? { dxPct: -3.1, dyPct: -1.6 } : { dxPct: 3.1, dyPct: 1.8 };
+  }
+  if (total === 3) {
+    const coords = [
+      { dxPct: -3.3, dyPct: -2.4 },
+      { dxPct: 3.3, dyPct: -2.0 },
+      { dxPct: 0, dyPct: 2.8 },
+    ];
+    return coords[index] ?? { dxPct: 0, dyPct: 0 };
+  }
+  const coords = [
+    { dxPct: -3.1, dyPct: -2.5 },
+    { dxPct: 3.1, dyPct: -2.3 },
+    { dxPct: -2.9, dyPct: 2.6 },
+    { dxPct: 2.9, dyPct: 2.8 },
+  ];
+  return coords[index] ?? { dxPct: 0, dyPct: 0 };
 }
 
 const TILE_GRID_CLASSES: Record<number, string> = {
@@ -104,6 +133,7 @@ const TreasureStatsChest3D: React.FC<{ totalRolls: number }> = ({ totalRolls }) 
 export const Board: React.FC<BoardProps> = ({
   gameState,
   tiles,
+  visualPositions,
   isMyTurn,
   gameSpeed = 1,
   moneyPopups = [],
@@ -144,22 +174,24 @@ export const Board: React.FC<BoardProps> = ({
     gameState.phase === 'ROLLING' ? rollingFace : (gameState.lastDice ?? 5);
   const pips = DICE_PIPS[activeDice] ?? [4];
 
+  const activePlayers = gameState.players.filter((p) => !p.bankrupt);
+  const currentVisualPos = currentPlayer
+    ? (visualPositions[currentPlayer.id] ?? currentPlayer.position)
+    : null;
+
   return (
-    <div className="@container w-full max-w-[min(440px,max(304px,calc(100dvh-205px)))] sm:max-w-[min(580px,max(340px,calc(100dvh-205px)))] mx-auto">
+    <div className="@container w-[min(94vw,max(264px,calc(100dvh-250px)))] sm:w-[min(75vw,65dvh)] lg:w-[min(54vw,66dvh)] lg:max-w-[590px] aspect-square mx-auto shrink-0">
       {/* 5x5 Cream 3D Board Perimeter */}
-      <div className="grid grid-cols-5 grid-rows-5 gap-1 @[380px]:gap-1.5 @[460px]:gap-2 aspect-square rounded-2xl @[460px]:rounded-[28px] bg-[#FAF6EE] p-1.5 @[380px]:p-2 @[460px]:p-3 border-2 @[460px]:border-4 border-[#F5E6C8] border-b-[6px] @[460px]:border-b-[10px] border-b-[#D4BE92] shadow-[0_14px_30px_rgba(30,65,20,0.22)]">
+      <div className="relative w-full h-full grid grid-cols-5 grid-rows-5 gap-1 @[380px]:gap-1.5 @[460px]:gap-2 aspect-square rounded-2xl @[460px]:rounded-[28px] bg-[#FAF6EE] p-1.5 @[380px]:p-2 @[460px]:p-3 border-2 @[460px]:border-4 border-[#F5E6C8] border-b-[6px] @[460px]:border-b-[10px] border-b-[#D4BE92] shadow-[0_14px_30px_rgba(30,65,20,0.22)]">
         {tiles.map((tile) => {
           const propState = gameState.properties[tile.id];
           const owner = propState?.ownerId
             ? gameState.players.find((p) => p.id === propState.ownerId)
             : undefined;
-          const playersHere = gameState.players.filter(
-            (p) => !p.bankrupt && p.position === tile.id
-          );
           const isCurrentTurnTile =
             Boolean(currentPlayer) &&
             !currentPlayer.bankrupt &&
-            currentPlayer.position === tile.id;
+            currentVisualPos === tile.id;
 
           return (
             <Tile
@@ -167,11 +199,6 @@ export const Board: React.FC<BoardProps> = ({
               tile={tile}
               propState={propState}
               owner={owner}
-              playersHere={playersHere}
-              activePlayerId={currentPlayer?.id}
-              phase={gameState.phase}
-              gameSpeed={gameSpeed}
-              moneyPopups={moneyPopups}
               isWarpTarget={isWarpMode && tile.id !== 9}
               isCurrentTurnTile={isCurrentTurnTile}
               onSelectWarp={onSelectWarp}
@@ -351,6 +378,115 @@ export const Board: React.FC<BoardProps> = ({
               </>
             )}
           </div>
+        </div>
+
+        {/* Persistent Coordinate-Based 3D Token Overlay (Zero Warping, Smooth Step-by-Step Hop) */}
+        <div className="absolute inset-1.5 @[380px]:inset-2 @[460px]:inset-3 pointer-events-none z-30 overflow-visible">
+          {activePlayers.map((p, playerIdx) => {
+            const visualPos = visualPositions[p.id] ?? p.position;
+            const coords = getBoardTileCoordinates(visualPos);
+            const peersHere = activePlayers.filter(
+              (pl) => (visualPositions[pl.id] ?? pl.position) === visualPos
+            );
+            const stackIdx = Math.max(0, peersHere.findIndex((pl) => pl.id === p.id));
+            const offset = getOverlayStackOffsetPct(stackIdx, peersHere.length);
+            const c = COLOR_META[p.color];
+            const isActiveToken = p.id === currentPlayer?.id;
+            const isStepping = gameState.phase === 'MOVING' && isActiveToken;
+            const tokenPopups = moneyPopups.filter((m) => m.playerId === p.id);
+
+            return (
+              <motion.div
+                key={p.id}
+                initial={false}
+                animate={{
+                  left: `${coords.leftPct + offset.dxPct}%`,
+                  top: `${coords.topPct + offset.dyPct}%`,
+                }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 340,
+                  damping: 26,
+                  mass: 0.72,
+                }}
+                title={p.name}
+                style={{ zIndex: isActiveToken ? 40 : 20 + playerIdx }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center overflow-visible"
+              >
+                {/* Active / Hopping Glow Aura */}
+                {isActiveToken && (
+                  <motion.span
+                    animate={{
+                      scale: isStepping ? [1, 1.55, 1.1] : [1, 1.3, 1],
+                      opacity: isStepping ? [0.85, 0.35, 0.85] : [0.6, 0.22, 0.6],
+                    }}
+                    transition={{
+                      duration: isStepping ? (gameSpeed === 2 ? 0.32 : 0.55) : 2.2,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                    }}
+                    className="absolute inset-0 rounded-full pointer-events-none"
+                    style={{
+                      backgroundColor: c.hex,
+                      boxShadow: `0 0 12px 3px ${c.hex}`,
+                    }}
+                  />
+                )}
+
+                {/* Per-Step Hop Arc & Idle Floating */}
+                <motion.div
+                  key={isStepping ? `hop-${p.id}-${visualPos}` : `idle-${p.id}`}
+                  initial={isStepping ? { y: 0, scale: 1 } : false}
+                  animate={
+                    isStepping
+                      ? { y: [0, -14, 0], scale: [1, 1.24, 1] }
+                      : { y: [0, -2.5, 0], scale: 1 }
+                  }
+                  transition={
+                    isStepping
+                      ? {
+                          duration: gameSpeed === 2 ? 0.14 : 0.25,
+                          ease: 'easeOut',
+                        }
+                      : {
+                          duration: 2.1,
+                          repeat: Infinity,
+                          ease: 'easeInOut',
+                          delay: playerIdx * 0.28,
+                        }
+                  }
+                >
+                  <Token3D color={p.color} size="board" showShadow />
+                </motion.div>
+
+                {/* Floating Money Text above Token */}
+                <AnimatePresence>
+                  {tokenPopups.map((pop) => (
+                    <motion.div
+                      key={pop.id}
+                      initial={{ opacity: 0, y: 2, scale: 0.8 }}
+                      animate={{
+                        opacity: [0, 1, 1, 0],
+                        y: [2, -18, -30, -40],
+                        scale: [0.8, 1.12, 1, 0.95],
+                      }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.8, ease: 'easeOut' }}
+                      className={`absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono-num text-[10px] sm:text-xs font-extrabold px-1.5 py-0.5 rounded-full shadow-md border border-white pointer-events-none z-50 ${
+                        pop.amount >= 0
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-rose-500 text-white'
+                      }`}
+                    >
+                      {pop.amount >= 0
+                        ? `+฿${pop.amount.toLocaleString()}`
+                        : `-฿${Math.abs(pop.amount).toLocaleString()}`}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>

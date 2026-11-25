@@ -96,10 +96,10 @@ export const FrequencyTracker: React.FC<FrequencyTrackerProps> = ({
         </span>
       </div>
 
-      <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs">
-        <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+      <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-xs">
+        <div className="flex items-center gap-1.5 text-amber-900 font-bold whitespace-nowrap">
           <Crown
-            className={`h-4 w-4 shrink-0 ${
+            className={`h-3.5 w-3.5 shrink-0 ${
               stats.modeActive ? 'text-amber-500 fill-amber-400' : 'text-amber-400'
             }`}
           />
@@ -111,19 +111,19 @@ export const FrequencyTracker: React.FC<FrequencyTrackerProps> = ({
           </span>
         ) : (
           <span className="text-amber-700 font-medium text-[11px] whitespace-nowrap">
-            เริ่มใช้งานรอบที่ 3 (ตอนนี้รอบ {currentRound})
+            เริ่มรอบ 3 (รอบ {currentRound})
           </span>
         )}
       </div>
 
       <div className="overflow-hidden rounded-xl border-2 border-[#E6D7B9]">
-        <table className="w-full text-xs sm:text-sm border-collapse">
+        <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-[#FAF6EE] text-slate-600 border-b border-[#E6D7B9]">
-              <th className="py-2 px-3 text-left font-bold">แต้ม</th>
-              <th className="py-2 px-3 text-right font-bold">ความถี่ (f)</th>
-              <th className="py-2 px-3 text-right font-bold">ร้อยละ</th>
-              <th className="py-2 px-3 text-left font-bold w-24 sm:w-32">แผนภูมิ</th>
+              <th className="py-1.5 px-2.5 text-left font-bold whitespace-nowrap">แต้ม</th>
+              <th className="py-1.5 px-2 text-right font-bold whitespace-nowrap">ความถี่</th>
+              <th className="py-1.5 px-2 text-right font-bold whitespace-nowrap">ร้อยละ</th>
+              <th className="py-1.5 px-2.5 text-left font-bold w-24">แผนภูมิ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F3E9D2]">
@@ -144,9 +144,9 @@ export const FrequencyTracker: React.FC<FrequencyTrackerProps> = ({
                         : 'bg-white'
                   }
                 >
-                  <td className="py-2 px-3 font-mono-num font-extrabold text-slate-900">
+                  <td className="py-1.5 px-2.5 font-mono-num font-extrabold text-slate-900">
                     <div className="flex items-center gap-1.5">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-[#FAF6EE] border border-[#E6D7B9]">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-[#FAF6EE] border border-[#E6D7B9]">
                         {row.face}
                       </span>
                       {row.isMode && (
@@ -157,13 +157,13 @@ export const FrequencyTracker: React.FC<FrequencyTrackerProps> = ({
                       )}
                     </div>
                   </td>
-                  <td className="py-2 px-3 text-right font-mono-num font-bold text-slate-800">
+                  <td className="py-1.5 px-2 text-right font-mono-num font-bold text-slate-800">
                     {row.count}
                   </td>
-                  <td className="py-2 px-3 text-right font-mono-num font-semibold text-slate-600">
+                  <td className="py-1.5 px-2 text-right font-mono-num font-semibold text-slate-600">
                     {row.relativePercent.toFixed(1)}%
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-1.5 px-2.5">
                     <div className="h-3 w-full rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${

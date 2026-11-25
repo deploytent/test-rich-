@@ -1,41 +1,12 @@
 import React from 'react';
-import { AnimatePresence, motion } from 'motion/react';
 import { Home } from 'lucide-react';
-import type { GamePhase, MoneyPopup, Player, PropertyGroup, PropertyState, TileConfig } from '../types';
+import type { Player, PropertyGroup, PropertyState, TileConfig } from '../types';
 import { COLOR_META } from '../gameRules';
-import { Token3D } from './Token3D';
-
-function getTokenStackOffset(index: number, total: number): { xPct: number; yPct: number } {
-  if (total <= 1) return { xPct: 0, yPct: 0 };
-  if (total === 2) {
-    return index === 0 ? { xPct: -36, yPct: -18 } : { xPct: 36, yPct: 20 };
-  }
-  if (total === 3) {
-    const coords = [
-      { xPct: -40, yPct: -26 },
-      { xPct: 40, yPct: -22 },
-      { xPct: 0, yPct: 30 },
-    ];
-    return coords[index] ?? { xPct: 0, yPct: 0 };
-  }
-  const coords = [
-    { xPct: -36, yPct: -28 },
-    { xPct: 36, yPct: -26 },
-    { xPct: -34, yPct: 28 },
-    { xPct: 34, yPct: 30 },
-  ];
-  return coords[index] ?? { xPct: 0, yPct: 0 };
-}
 
 interface TileProps {
   tile: TileConfig;
   propState?: PropertyState;
   owner?: Player;
-  playersHere: Player[];
-  activePlayerId?: string;
-  phase?: GamePhase;
-  gameSpeed?: 1 | 2;
-  moneyPopups?: MoneyPopup[];
   isWarpTarget: boolean;
   isCurrentTurnTile: boolean;
   onSelectWarp?: (tileId: number) => void;
@@ -50,8 +21,8 @@ const GROUP_BAND_HEX: Record<Exclude<PropertyGroup, 'utility'>, string> = {
 };
 
 function renderTileVectorIcon(tile: TileConfig) {
-  const propIconCls = 'h-4 w-4 @[380px]:h-5 @[380px]:w-5 @[460px]:h-7 @[460px]:w-7';
-  const specialIconCls = 'h-5 w-5 @[380px]:h-6 @[380px]:w-6 @[460px]:h-8 @[460px]:w-8';
+  const propIconCls = 'h-4 w-4 @[360px]:h-5 @[360px]:w-5 @[460px]:h-7 @[460px]:w-7';
+  const specialIconCls = 'h-5 w-5 @[360px]:h-6 @[360px]:w-6 @[460px]:h-8 @[460px]:w-8';
 
   switch (tile.id) {
     case 1: // START
@@ -92,7 +63,7 @@ function renderTileVectorIcon(tile: TileConfig) {
       );
     case 5: // Research Lab
       return (
-        <svg viewBox="0 0 44 40" className="h-5 w-6 @[380px]:h-6 @[380px]:w-7 @[460px]:h-8 @[460px]:w-9" aria-hidden="true">
+        <svg viewBox="0 0 44 40" className="h-5 w-6 @[360px]:h-6 @[360px]:w-7 @[460px]:h-8 @[460px]:w-9" aria-hidden="true">
           <polygon points="22,6 38,14 22,22 6,14" fill="#C7D2FE" />
           <polygon points="6,14 22,22 22,36 6,28" fill="#818CF8" />
           <polygon points="38,14 22,22 22,36 38,28" fill="#6366F1" />
@@ -207,11 +178,6 @@ export const Tile: React.FC<TileProps> = ({
   tile,
   propState,
   owner,
-  playersHere,
-  activePlayerId,
-  phase,
-  gameSpeed = 1,
-  moneyPopups = [],
   isWarpTarget,
   isCurrentTurnTile,
   onSelectWarp,
@@ -226,15 +192,10 @@ export const Tile: React.FC<TileProps> = ({
 
   const ownerMeta = owner ? COLOR_META[owner.color] : null;
   const level = propState?.level ?? 0;
-  const hasActiveOrPopup =
-    playersHere.some((p) => p.id === activePlayerId) ||
-    playersHere.some((p) => moneyPopups.some((m) => m.playerId === p.id));
 
   const content = (
     <div
-      className={`relative h-full w-full rounded-xl @[460px]:rounded-2xl select-none transition-transform overflow-visible ${
-        hasActiveOrPopup ? 'z-20' : 'z-0'
-      } ${
+      className={`relative h-full w-full rounded-xl @[460px]:rounded-2xl select-none transition-transform ${
         isWarpTarget
           ? 'ring-3 @[460px]:ring-4 ring-violet-400 cursor-pointer hover:scale-[1.04] shadow-lg'
           : isCurrentTurnTile
@@ -253,7 +214,7 @@ export const Tile: React.FC<TileProps> = ({
         {hasPriceBar ? (
           <div
             style={{ backgroundColor: ownerMeta ? ownerMeta.hex : bandHex }}
-            className="flex items-center justify-between gap-0.5 px-1 @[460px]:px-1.5 py-0.5 @[460px]:py-1 text-[8px] @[380px]:text-[9px] @[460px]:text-[11px] font-extrabold text-white leading-none shadow-xs"
+            className="flex items-center justify-between gap-0.5 px-1 @[460px]:px-1.5 py-0.5 @[460px]:py-1 text-[8px] @[360px]:text-[9px] @[460px]:text-[11px] font-extrabold text-white leading-none shadow-xs"
           >
             <span className="font-mono-num truncate drop-shadow-[0_1px_1px_rgba(0,0,0,0.22)]">
               {ownerMeta
@@ -261,14 +222,14 @@ export const Tile: React.FC<TileProps> = ({
                 : `฿${(tile.price ?? 0).toLocaleString()}`}
             </span>
             {level > 0 && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600 border border-white/80 px-1 py-0.5 text-[7px] @[380px]:text-[8px] @[460px]:text-[9px] font-extrabold text-white shrink-0 shadow-xs">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600 border border-white/80 px-1 py-0.5 text-[7px] @[360px]:text-[8px] @[460px]:text-[9px] font-extrabold text-white shrink-0 shadow-xs">
                 <Home className="h-2 w-2 @[460px]:h-2.5 @[460px]:w-2.5 fill-white" />
                 <span>{level}</span>
               </span>
             )}
           </div>
         ) : (
-          <div className="px-1 @[460px]:px-1.5 pt-0.5 flex items-center justify-between text-[7.5px] @[380px]:text-[8px] @[460px]:text-[10px] font-mono-num font-extrabold text-amber-700/60 leading-none">
+          <div className="px-1 @[460px]:px-1.5 pt-0.5 flex items-center justify-between text-[7.5px] @[360px]:text-[8.5px] @[460px]:text-[10px] font-mono-num font-extrabold text-amber-700/60 leading-none">
             <span>#{tile.id}</span>
           </div>
         )}
@@ -281,123 +242,16 @@ export const Tile: React.FC<TileProps> = ({
         {/* Crisp Bottom Label */}
         <div className="px-0.5 @[460px]:px-1.5 pb-0.5 @[460px]:pb-1 flex items-center justify-center">
           {isColoredProperty || tile.type === 'utility' ? (
-            <p className="text-[7px] @[380px]:text-[8.5px] @[460px]:text-[11px] font-extrabold text-slate-800 text-center leading-tight tracking-tighter @[460px]:tracking-normal line-clamp-1">
+            <p className="text-[7.5px] @[360px]:text-[9px] @[460px]:text-[11px] font-extrabold text-slate-800 text-center leading-tight tracking-tighter @[460px]:tracking-normal line-clamp-1">
               {tile.shortName}
             </p>
           ) : (
-            <span className="inline-block max-w-full truncate rounded-full bg-[#FAF2E0] border border-[#E6D7B9] px-1 @[380px]:px-1.5 @[460px]:px-2 py-0.5 text-[6.5px] @[380px]:text-[8px] @[460px]:text-[10px] font-extrabold text-slate-700 leading-none tracking-tighter @[460px]:tracking-normal">
+            <span className="inline-block max-w-full truncate rounded-full bg-[#FAF2E0] border border-[#E6D7B9] px-1 @[360px]:px-1.5 @[460px]:px-2 py-0.5 text-[7px] @[360px]:text-[8px] @[460px]:text-[10px] font-extrabold text-slate-700 leading-none tracking-tighter @[460px]:tracking-normal">
               {tile.shortName}
             </span>
           )}
         </div>
       </div>
-
-      {/* Player 3D Tactile Tokens Overlay + Offset Stacking + Idle Float + Step Hop + Floating Money Text */}
-      {playersHere.length > 0 && (
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20 overflow-visible">
-          {playersHere.map((p, idx) => {
-            const c = COLOR_META[p.color];
-            const isActiveToken = p.id === activePlayerId;
-            const isStepping = phase === 'MOVING' && isActiveToken;
-            const tokenPopups = moneyPopups.filter((m) => m.playerId === p.id);
-            const offset = getTokenStackOffset(idx, playersHere.length);
-
-            return (
-              <div
-                key={p.id}
-                className="absolute flex items-center justify-center overflow-visible"
-                style={{
-                  transform: `translate(${offset.xPct}%, ${offset.yPct}%)`,
-                  zIndex: isActiveToken ? 30 : 12 + idx,
-                }}
-              >
-                <motion.div
-                  layoutId={`token-${p.id}`}
-                  transition={{ type: 'spring', stiffness: 240, damping: 24 }}
-                  title={p.name}
-                  className="relative flex items-center justify-center"
-                >
-                  {/* Active / Hopping Glow Aura beneath token */}
-                  {isActiveToken && (
-                    <motion.span
-                      animate={{
-                        scale: isStepping ? [1, 1.55, 1.1] : [1, 1.32, 1],
-                        opacity: isStepping ? [0.85, 0.35, 0.85] : [0.6, 0.22, 0.6],
-                      }}
-                      transition={{
-                        duration: isStepping
-                          ? gameSpeed === 2
-                            ? 0.45
-                            : 0.85
-                          : 2.2,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                      }}
-                      className="absolute inset-0 rounded-full pointer-events-none"
-                      style={{
-                        backgroundColor: c.hex,
-                        boxShadow: `0 0 12px 3px ${c.hex}`,
-                      }}
-                    />
-                  )}
-
-                  {/* Per-Tile Hop Bounce & Idle Floating */}
-                  <motion.div
-                    key={isStepping ? `hop-${p.id}-${p.position}` : `idle-${p.id}`}
-                    initial={isStepping ? { y: 0, scale: 1 } : false}
-                    animate={
-                      isStepping
-                        ? { y: [0, -14, 0], scale: [1, 1.24, 1] }
-                        : { y: [0, -2.5, 0], scale: 1 }
-                    }
-                    transition={
-                      isStepping
-                        ? {
-                            duration: gameSpeed === 2 ? 0.24 : 0.48,
-                            ease: 'easeOut',
-                          }
-                        : {
-                            duration: 2.1,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                            delay: idx * 0.28,
-                          }
-                    }
-                  >
-                    <Token3D color={p.color} size="board" showShadow />
-                  </motion.div>
-
-                  {/* Floating Money Text above Token */}
-                  <AnimatePresence>
-                    {tokenPopups.map((pop) => (
-                      <motion.div
-                        key={pop.id}
-                        initial={{ opacity: 0, y: 2, scale: 0.8 }}
-                        animate={{
-                          opacity: [0, 1, 1, 0],
-                          y: [2, -18, -30, -40],
-                          scale: [0.8, 1.12, 1, 0.95],
-                        }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1.8, ease: 'easeOut' }}
-                        className={`absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono-num text-[10px] sm:text-xs font-extrabold px-1.5 py-0.5 rounded-full shadow-md border border-white pointer-events-none z-30 ${
-                          pop.amount >= 0
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-rose-500 text-white'
-                        }`}
-                      >
-                        {pop.amount >= 0
-                          ? `+฿${pop.amount.toLocaleString()}`
-                          : `-฿${Math.abs(pop.amount).toLocaleString()}`}
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 
