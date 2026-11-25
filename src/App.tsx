@@ -173,6 +173,7 @@ export default function App() {
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>(1);
   const [moneyPopups, setMoneyPopups] = useState<MoneyPopup[]>([]);
   const [visualPositions, setVisualPositions] = useState<Record<string, number>>({});
+  const [showYourTurnBanner, setShowYourTurnBanner] = useState<boolean>(false);
   const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const [lastSoloConfig, setLastSoloConfig] = useState<{
     botCount: 1 | 2 | 3;
@@ -182,6 +183,8 @@ export default function App() {
 
   const botTimerRef = useRef<number | null>(null);
   const turnTimersRef = useRef<number[]>([]);
+  const turnBannerTimerRef = useRef<number | null>(null);
+  const lastNotifiedTurnKeyRef = useRef<string | null>(null);
   const isSteppingRef = useRef<boolean>(false);
   const movingContextRef = useRef<{
     playerId: string;
@@ -1018,6 +1021,7 @@ export default function App() {
       if (!rollingPlayer || rollingPlayer.bankrupt || baseState.phase !== 'IDLE') return;
 
       clearTurnTimers();
+      setShowYourTurnBanner(false);
       isSteppingRef.current = true;
       soundFx.playRoll();
       const roll = Math.floor(Math.random() * 6) + 1;
@@ -1041,10 +1045,8 @@ export default function App() {
       };
       commitState(rollingState);
 
-      const rollDelay = getScaledDelay(
-        rollingPlayer.isBot ? BOT_DELAYS.ROLL_MS : 1250,
-        gameSpeedRef.current
-      );
+      const rollDelay = getScaledDelay(BOT_DELAYS.ROLL_MS, gameSpeedRef.current);
+      const revealDelay = getScaledDelay(BOT_DELAYS.ROLL_REVEAL_MS, gameSpeedRef.current);
 
       scheduleTurnTimer(() => {
         const latest = stateRef.current;
@@ -1110,45 +1112,77 @@ export default function App() {
               logs = prependLog(logs, makeLog(latest.currentRound, labSummary, 'alert'));
             }
             players[idx] = p;
-            isSteppingRef.current = false;
-            commitState(advanceTurnAndCheckEnd({ ...latest, players, logs }, labSummary));
+            commitState({
+              ...latest,
+              players,
+              logs,
+              speechMessage: labSummary,
+              phase: 'DICE_RESULT',
+            });
+            scheduleTurnTimer(() => {
+              const afterReveal = stateRef.current;
+              isSteppingRef.current = false;
+              if (!afterReveal || afterReveal.status !== 'playing') return;
+              commitState(advanceTurnAndCheckEnd(afterReveal, labSummary));
+            }, revealDelay);
             return;
           }
         }
 
-        const { newPos, passedStart } = advanceBoardPosition(p.position, roll);
-        p.position = newPos;
-
-        if (passedStart) {
-          p.cash += START_PASS_BONUS;
-          soundFx.playGain();
-          logs = prependLog(
-            logs,
-            makeLog(
-              latest.currentRound,
-              `${p.name} ผ่านจุดเริ่มต้น รับทุนวิจัย +฿${START_PASS_BONUS.toLocaleString()}`,
-              'gain'
-            )
-          );
-        }
-
+        // Pause briefly (0.4s) to let players read the rolled dice face clearly before hopping
         players[idx] = p;
-        movingContextRef.current = {
-          playerId: p.id,
-          playerIndex: idx,
-          roll,
-          targetPos: newPos,
-          landingTriggered: false,
-        };
-
-        const startMovingState: GameState = {
+        commitState({
           ...latest,
           players,
           logs,
           speechMessage: speech,
-          phase: 'MOVING',
-        };
-        commitState(startMovingState);
+          phase: 'DICE_RESULT',
+        });
+
+        scheduleTurnTimer(() => {
+          const postReveal = stateRef.current;
+          if (!postReveal || postReveal.status !== 'playing') {
+            isSteppingRef.current = false;
+            return;
+          }
+
+          const movePlayers = [...postReveal.players];
+          const mover = { ...movePlayers[idx] };
+          let moveLogs = [...postReveal.logs];
+
+          const { newPos, passedStart } = advanceBoardPosition(mover.position, roll);
+          mover.position = newPos;
+
+          if (passedStart) {
+            mover.cash += START_PASS_BONUS;
+            soundFx.playGain();
+            moveLogs = prependLog(
+              moveLogs,
+              makeLog(
+                postReveal.currentRound,
+                `${mover.name} ผ่านจุดเริ่มต้น รับทุนวิจัย +฿${START_PASS_BONUS.toLocaleString()}`,
+                'gain'
+              )
+            );
+          }
+
+          movePlayers[idx] = mover;
+          movingContextRef.current = {
+            playerId: mover.id,
+            playerIndex: idx,
+            roll,
+            targetPos: newPos,
+            landingTriggered: false,
+          };
+
+          commitState({
+            ...postReveal,
+            players: movePlayers,
+            logs: moveLogs,
+            speechMessage: speech,
+            phase: 'MOVING',
+          });
+        }, revealDelay);
       }, rollDelay);
     },
     [advanceTurnAndCheckEnd, clearTurnTimers, commitState, scheduleTurnTimer]
@@ -1186,7 +1220,7 @@ export default function App() {
       return changed ? next : prev;
     });
 
-    const stepMs = gameSpeed === 2 ? 150 : 280;
+    const stepMs = getScaledDelay(BOT_DELAYS.STEP_MS, gameSpeed);
     const intervalId = window.setInterval(() => {
       const latest = stateRef.current;
       if (!latest || latest.status !== 'playing' || latest.phase !== 'MOVING') return;
@@ -1262,6 +1296,57 @@ export default function App() {
       currentPlayer &&
       (!gameState.isOnline || currentPlayer.id === localPlayerId)
   );
+
+  // Trigger glowing "🎲 เทิร์นของคุณ! (Your Turn)" banner + chime when turn arrives at local human player
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'playing') {
+      lastNotifiedTurnKeyRef.current = null;
+      if (turnBannerTimerRef.current) {
+        window.clearTimeout(turnBannerTimerRef.current);
+        turnBannerTimerRef.current = null;
+      }
+      setShowYourTurnBanner(false);
+      return;
+    }
+
+    const active = gameState.players[gameState.turnIndex];
+    const turnKey = `${gameState.currentRound}-${gameState.turnIndex}-${active?.id ?? ''}`;
+
+    if (gameState.phase === 'IDLE' && isMyTurn && active && !active.isBot) {
+      if (lastNotifiedTurnKeyRef.current !== turnKey) {
+        lastNotifiedTurnKeyRef.current = turnKey;
+        if (turnBannerTimerRef.current) {
+          window.clearTimeout(turnBannerTimerRef.current);
+        }
+        setShowYourTurnBanner(true);
+        soundFx.playTurnBell();
+        turnBannerTimerRef.current = window.setTimeout(() => {
+          turnBannerTimerRef.current = null;
+          setShowYourTurnBanner(false);
+        }, 1200);
+      }
+    } else if (gameState.phase !== 'IDLE') {
+      if (turnBannerTimerRef.current) {
+        window.clearTimeout(turnBannerTimerRef.current);
+        turnBannerTimerRef.current = null;
+      }
+      setShowYourTurnBanner(false);
+    }
+  }, [
+    gameState?.status,
+    gameState?.phase,
+    gameState?.currentRound,
+    gameState?.turnIndex,
+    isMyTurn,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (turnBannerTimerRef.current) {
+        window.clearTimeout(turnBannerTimerRef.current);
+      }
+    };
+  }, []);
 
   const handlePayLabBail = () => {
     if (!gameState || !currentPlayer || currentPlayer.cash < LAB_BAIL_COST) return;
@@ -1739,7 +1824,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-[100dvh] lg:h-[100dvh] lg:max-h-[100dvh] bg-gradient-to-b from-[#A8E6CF] via-[#8AD979] to-[#7BC043] text-slate-800 flex flex-col justify-between overflow-x-hidden lg:overflow-y-hidden">
+    <div className="min-h-[100dvh] lg:h-[100dvh] lg:max-h-[100dvh] bg-gradient-to-b from-[#A8E6CF] via-[#8AD979] to-[#7BC043] text-slate-800 flex flex-col justify-between gap-1 sm:gap-2 overflow-x-hidden lg:overflow-y-hidden">
       {/* Monopoly GO! Top Bar: Cream-white pill with Avatar, Banknote Cash, Rivals, and Speed/Mute/Exit */}
       <TopMonopolyBar
         gameState={gameState}
@@ -1761,13 +1846,14 @@ export default function App() {
       />
 
       {/* Main Playfield: Responsive Square Board + Desktop Side Stats Panel + Mobile 2x2 Player Strip */}
-      <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto px-1.5 min-[380px]:px-2.5 sm:px-6 pt-1 pb-2 sm:py-2 flex flex-col items-center justify-center">
+      <main className="flex-1 min-h-0 w-full max-w-6xl mx-auto px-1 min-[380px]:px-1.5 sm:px-5 py-1 sm:py-1.5 flex flex-col items-center justify-center gap-2">
         <div className="w-full flex flex-col lg:flex-row items-center justify-center lg:gap-5 xl:gap-7">
           <Board
             gameState={gameState}
             tiles={tiles}
             visualPositions={visualPositions}
             isMyTurn={isMyTurn}
+            showYourTurnBanner={showYourTurnBanner}
             gameSpeed={gameSpeed}
             moneyPopups={moneyPopups}
             canSkipOnlineTurn={canSkipOnlineTurn}
@@ -1783,7 +1869,7 @@ export default function App() {
           <DesktopSidePanel gameState={gameState} tiles={tiles} />
         </div>
 
-        <MobilePlayerGrid gameState={gameState} moneyPopups={moneyPopups} />
+        <MobilePlayerGrid gameState={gameState} tiles={tiles} moneyPopups={moneyPopups} />
       </main>
 
       {/* Bottom Cream & Gold Menu Bar + Protruding Red-Orange Diamond GO Roll Button */}

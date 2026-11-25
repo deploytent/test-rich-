@@ -62,6 +62,11 @@ class SoundEngine {
     this.playTone(180, 0.22, 'square', 0.05, 0.14);
   }
 
+  playTurnBell() {
+    this.playTone(880, 0.14, 'sine', 0.06, 0);
+    this.playTone(1318.5, 0.24, 'sine', 0.07, 0.09);
+  }
+
   playVictory() {
     const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
     notes.forEach((f, i) => this.playTone(f, 0.22, 'triangle', 0.09, i * 0.1));

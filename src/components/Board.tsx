@@ -16,6 +16,7 @@ interface BoardProps {
   tiles: TileConfig[];
   visualPositions: Record<string, number>;
   isMyTurn: boolean;
+  showYourTurnBanner?: boolean;
   gameSpeed?: 1 | 2;
   moneyPopups?: MoneyPopup[];
   canSkipOnlineTurn: boolean;
@@ -135,6 +136,7 @@ export const Board: React.FC<BoardProps> = ({
   tiles,
   visualPositions,
   isMyTurn,
+  showYourTurnBanner = false,
   gameSpeed = 1,
   moneyPopups = [],
   canSkipOnlineTurn,
@@ -180,9 +182,9 @@ export const Board: React.FC<BoardProps> = ({
     : null;
 
   return (
-    <div className="@container w-[min(94vw,max(264px,calc(100dvh-250px)))] sm:w-[min(75vw,65dvh)] lg:w-[min(54vw,66dvh)] lg:max-w-[590px] aspect-square mx-auto shrink-0">
+    <div className="@container w-[min(97vw,max(280px,calc(100dvh-250px)))] max-w-[520px] sm:w-[min(78vw,66dvh)] sm:max-w-[560px] lg:w-[min(56vw,69dvh)] lg:max-w-[610px] aspect-square mx-auto shrink-0">
       {/* 5x5 Cream 3D Board Perimeter */}
-      <div className="relative w-full h-full grid grid-cols-5 grid-rows-5 gap-1 @[380px]:gap-1.5 @[460px]:gap-2 aspect-square rounded-2xl @[460px]:rounded-[28px] bg-[#FAF6EE] p-1.5 @[380px]:p-2 @[460px]:p-3 border-2 @[460px]:border-4 border-[#F5E6C8] border-b-[6px] @[460px]:border-b-[10px] border-b-[#D4BE92] shadow-[0_14px_30px_rgba(30,65,20,0.22)]">
+      <div className="relative w-full h-full grid grid-cols-5 grid-rows-5 gap-0.5 @[380px]:gap-1 @[460px]:gap-1.5 aspect-square rounded-2xl @[460px]:rounded-[28px] bg-[#FAF6EE] p-1 @[380px]:p-1.5 @[460px]:p-2.5 border-2 @[460px]:border-4 border-[#F5E6C8] border-b-[6px] @[460px]:border-b-[10px] border-b-[#D4BE92] shadow-[0_14px_30px_rgba(30,65,20,0.22)]">
         {tiles.map((tile) => {
           const propState = gameState.properties[tile.id];
           const owner = propState?.ownerId
@@ -327,22 +329,31 @@ export const Board: React.FC<BoardProps> = ({
                   onClick={onRollDice}
                   data-testid="center-dice-btn"
                   aria-label={canRollHere ? 'กดทอยลูกเต๋า' : `หน้าลูกเต๋า ${activeDice}`}
-                  key={`${gameState.totalRolls}-${gameState.phase === 'ROLLING' ? 'rolling' : 'rest'}`}
+                  key={`${gameState.totalRolls}-${gameState.phase === 'ROLLING' ? 'rolling' : gameState.phase === 'DICE_RESULT' ? 'result' : 'rest'}`}
                   animate={
                     gameState.phase === 'ROLLING'
                       ? {
-                          rotate: [0, -20, 22, -16, 14, 360],
+                          rotate: [0, -22, 24, -18, 16, 360],
                           x: [0, -4, 4, -3, 3, 0],
                           y: [0, -6, 2, -4, 0],
                           scale: [1, 1.18, 1.08, 1.16, 1],
                         }
-                      : { rotate: 0, x: 0, y: 0, scale: 1 }
+                      : gameState.phase === 'DICE_RESULT'
+                        ? { rotate: 0, x: 0, y: 0, scale: [1.24, 1] }
+                        : { rotate: 0, x: 0, y: 0, scale: 1 }
                   }
                   transition={{
-                    duration: gameState.phase === 'ROLLING' ? (gameSpeed === 2 ? 0.62 : 1.25) : 0.35,
+                    duration:
+                      gameState.phase === 'ROLLING'
+                        ? gameSpeed === 2
+                          ? 0.45
+                          : 0.9
+                        : gameState.phase === 'DICE_RESULT'
+                          ? 0.24
+                          : 0.3,
                     ease: 'easeInOut',
                   }}
-                  className={`h-8 w-8 @[380px]:h-9 @[380px]:w-9 @[460px]:h-12 @[460px]:w-12 rounded-lg @[460px]:rounded-xl bg-white border-2 border-[#E6D7B9] shadow-[0_3px_0_#CBD5E1] @[460px]:shadow-[0_4px_0_#CBD5E1] p-1 @[380px]:p-1.5 @[460px]:p-2 grid grid-cols-3 grid-rows-3 place-items-center transition-transform ${
+                  className={`h-9 w-9 @[380px]:h-10 @[380px]:w-10 @[460px]:h-13 @[460px]:w-13 rounded-lg @[460px]:rounded-xl bg-white border-2 border-[#E6D7B9] shadow-[0_3px_0_#CBD5E1] @[460px]:shadow-[0_4px_0_#CBD5E1] p-1 @[380px]:p-1.5 @[460px]:p-2 grid grid-cols-3 grid-rows-3 place-items-center transition-transform ${
                     canRollHere
                       ? 'cursor-pointer hover:-translate-y-0.5 ring-2 ring-[#F5C542]'
                       : 'cursor-default'
@@ -378,10 +389,30 @@ export const Board: React.FC<BoardProps> = ({
               </>
             )}
           </div>
+
+          {/* Glowing "Your Turn!" Notification Banner in Center Stage */}
+          <AnimatePresence>
+            {showYourTurnBanner && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.65, y: 10 }}
+                animate={{ opacity: 1, scale: [0.65, 1.08, 1], y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -8 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                data-testid="your-turn-banner"
+                className="pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 z-40 flex items-center justify-center"
+              >
+                <div className="rounded-2xl bg-gradient-to-r from-[#FF8C00] via-[#FACC15] to-[#FF6B35] border-[3px] border-white px-3.5 py-2 @[460px]:px-5 @[460px]:py-2.5 shadow-[0_0_28px_rgba(250,204,21,0.85),0_5px_0_#B45309] text-center">
+                  <p className="text-xs @[380px]:text-sm @[460px]:text-base font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.35)] whitespace-nowrap">
+                    🎲 เทิร์นของคุณ! (Your Turn)
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Persistent Coordinate-Based 3D Token Overlay (Zero Warping, Smooth Step-by-Step Hop) */}
-        <div className="absolute inset-1.5 @[380px]:inset-2 @[460px]:inset-3 pointer-events-none z-30 overflow-visible">
+        <div className="absolute inset-1 @[380px]:inset-1.5 @[460px]:inset-2.5 pointer-events-none z-30 overflow-visible">
           {activePlayers.map((p, playerIdx) => {
             const visualPos = visualPositions[p.id] ?? p.position;
             const coords = getBoardTileCoordinates(visualPos);
@@ -405,9 +436,8 @@ export const Board: React.FC<BoardProps> = ({
                 }}
                 transition={{
                   type: 'spring',
-                  stiffness: 340,
-                  damping: 26,
-                  mass: 0.72,
+                  stiffness: 220,
+                  damping: 20,
                 }}
                 title={p.name}
                 style={{ zIndex: isActiveToken ? 40 : 20 + playerIdx }}
@@ -439,13 +469,13 @@ export const Board: React.FC<BoardProps> = ({
                   initial={isStepping ? { y: 0, scale: 1 } : false}
                   animate={
                     isStepping
-                      ? { y: [0, -14, 0], scale: [1, 1.24, 1] }
+                      ? { y: [0, -18, 0], scale: [1, 1.24, 1] }
                       : { y: [0, -2.5, 0], scale: 1 }
                   }
                   transition={
                     isStepping
                       ? {
-                          duration: gameSpeed === 2 ? 0.14 : 0.25,
+                          duration: gameSpeed === 2 ? 0.18 : 0.36,
                           ease: 'easeOut',
                         }
                       : {

@@ -4,10 +4,11 @@ import { getSellToBankValue } from './gameRules';
 export type GameSpeed = 1 | 2;
 
 export const BOT_DELAYS = {
-  IDLE_MS: 1300,
-  ROLL_MS: 1350,
-  STEP_MS: 520,
-  LAND_PAUSE_MS: 1350,
+  IDLE_MS: 1200,
+  ROLL_MS: 900,
+  ROLL_REVEAL_MS: 400,
+  STEP_MS: 400,
+  LAND_PAUSE_MS: 1100,
   QUIZ_ANSWER_MS: 1250,
   QUIZ_RESULT_MS: 1200,
 } as const;

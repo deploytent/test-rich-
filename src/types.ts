@@ -7,6 +7,7 @@ export type BotDifficulty = 'rookie' | 'professor';
 export type GamePhase =
   | 'IDLE'          // Waiting for current player to roll (or pay/roll out of lab)
   | 'ROLLING'       // Dice rolling animation
+  | 'DICE_RESULT'   // Brief pause displaying rolled dice face before movement
   | 'MOVING'        // Token stepping across tiles
   | 'ACTION'        // Player landed and must decide (Buy / Upgrade / Takeover / Warp / Sell Debt)
   | 'QUIZ'          // Quiz modal active (Tiles 3 & 11)

@@ -235,15 +235,16 @@ test('dynamic buy-discount and upgrade generators produce valid fresh math puzzl
 import { BOT_DELAYS, getScaledDelay } from './botLogic';
 
 test('bot delays match relaxed pacing and 1x/2x scaling', () => {
-  assert.equal(BOT_DELAYS.IDLE_MS, 1300);
-  assert.equal(BOT_DELAYS.ROLL_MS, 1350);
-  assert.equal(BOT_DELAYS.STEP_MS, 520);
-  assert.equal(BOT_DELAYS.LAND_PAUSE_MS, 1350);
+  assert.equal(BOT_DELAYS.IDLE_MS, 1200);
+  assert.equal(BOT_DELAYS.ROLL_MS, 900);
+  assert.equal(BOT_DELAYS.ROLL_REVEAL_MS, 400);
+  assert.equal(BOT_DELAYS.STEP_MS, 400);
+  assert.equal(BOT_DELAYS.LAND_PAUSE_MS, 1100);
   assert.equal(BOT_DELAYS.QUIZ_ANSWER_MS, 1250);
   assert.equal(BOT_DELAYS.QUIZ_RESULT_MS, 1200);
-  assert.equal(getScaledDelay(BOT_DELAYS.IDLE_MS, 1), 1300);
-  assert.equal(getScaledDelay(BOT_DELAYS.IDLE_MS, 2), 650);
-  assert.equal(getScaledDelay(BOT_DELAYS.STEP_MS, 2), 260);
+  assert.equal(getScaledDelay(BOT_DELAYS.IDLE_MS, 1), 1200);
+  assert.equal(getScaledDelay(BOT_DELAYS.IDLE_MS, 2), 600);
+  assert.equal(getScaledDelay(BOT_DELAYS.STEP_MS, 2), 200);
 });
 
 test('getStepPath generates exact tile-by-tile sequence and detects Start crossing', () => {

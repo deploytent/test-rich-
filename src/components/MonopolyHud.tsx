@@ -97,7 +97,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
               <div
                 className={`relative flex items-center gap-1.5 min-[380px]:gap-2 rounded-xl min-[380px]:rounded-2xl px-2 py-1 border-2 transition-all overflow-visible shrink-0 ${
                   isHeroTurn
-                    ? 'bg-amber-50 border-[#F5C542] shadow-xs'
+                    ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-[#FACC15] ring-2 ring-[#FDE047]/80 shadow-[0_0_16px_rgba(250,204,21,0.5)]'
                     : 'bg-[#FAF6EE] border-[#E6D7B9]'
                 }`}
               >
@@ -106,7 +106,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
                   <Token3D color={heroPlayer.color} size="md" />
                   {isHeroTurn && (
                     <span
-                      className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500 border-2 border-white z-20"
+                      className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500 border-2 border-white z-20 animate-pulse"
                       aria-hidden="true"
                     />
                   )}
@@ -117,6 +117,11 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
                     <span className="text-[11px] min-[380px]:text-xs sm:text-sm font-extrabold text-slate-900 truncate max-w-[74px] min-[380px]:max-w-[100px] sm:max-w-[130px]">
                       {heroPlayer.name}
                     </span>
+                    {isHeroTurn && (
+                      <span className="rounded-full bg-amber-400 border border-white px-1.5 py-0.5 text-[9px] font-black text-slate-900 leading-none shadow-xs whitespace-nowrap">
+                        ตาของคุณ
+                      </span>
+                    )}
                     {heroPlayer.inLab && !heroPlayer.bankrupt && (
                       <FlaskConical className="h-3 w-3 text-indigo-600 shrink-0" />
                     )}
@@ -224,11 +229,13 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
 
 interface MobilePlayerGridProps {
   gameState: GameState;
+  tiles: TileConfig[];
   moneyPopups: MoneyPopup[];
 }
 
 export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
   gameState,
+  tiles,
   moneyPopups,
 }) => {
   const currentPlayerId = gameState.players[gameState.turnIndex]?.id;
@@ -236,34 +243,51 @@ export const MobilePlayerGrid: React.FC<MobilePlayerGridProps> = ({
   return (
     <section
       aria-label="รายชื่อผู้เล่นและเงินคงเหลือ"
-      className="sm:hidden w-[min(94vw,440px)] mx-auto grid grid-cols-2 gap-1.5 mt-1.5"
+      className="sm:hidden w-[97vw] max-w-[520px] mx-auto grid grid-cols-2 gap-2 mt-1"
     >
       {gameState.players.map((p) => {
         const isActive = p.id === currentPlayerId && !p.bankrupt;
         const pops = moneyPopups.filter((m) => m.playerId === p.id);
+        const ownedCount = tiles.filter(
+          (t) => gameState.properties[t.id]?.ownerId === p.id
+        ).length;
+        const netWorth = calculateNetWorth(p, tiles, gameState.properties);
+
         return (
           <div
             key={p.id}
-            className={`relative flex items-center justify-between gap-1.5 rounded-xl px-2 py-1 border-2 transition-all overflow-visible ${
+            className={`relative flex flex-col justify-between rounded-2xl px-2.5 py-2 border-2 transition-all overflow-visible ${
               p.bankrupt
                 ? 'bg-white/65 border-slate-300 opacity-55'
                 : isActive
-                  ? 'bg-[#FFFDF7] border-[#F5C542] ring-2 ring-sky-400 shadow-xs'
-                  : 'bg-[#FFFDF7]/95 border-[#E6D7B9]'
+                  ? 'bg-gradient-to-br from-[#FFFDF7] to-amber-50 border-[#FACC15] ring-2 ring-[#FDE047] shadow-sm'
+                  : 'bg-[#FFFDF7]/95 border-[#E6D7B9] shadow-xs'
             }`}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Token3D color={p.color} size="xs" />
-              <span className="text-[11px] font-extrabold text-slate-800 truncate">
-                {p.name}
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Token3D color={p.color} size="sm" />
+                <span className="text-xs font-extrabold text-slate-900 truncate">
+                  {p.name}
+                </span>
+                {p.inLab && !p.bankrupt && (
+                  <FlaskConical className="h-3 w-3 text-indigo-600 shrink-0" />
+                )}
+              </div>
+              <span className="font-mono-num text-xs font-extrabold text-emerald-700 shrink-0">
+                {p.bankrupt ? 'ล้มละลาย' : `฿${p.cash.toLocaleString()}`}
               </span>
-              {p.inLab && !p.bankrupt && (
-                <FlaskConical className="h-3 w-3 text-indigo-600 shrink-0" />
-              )}
             </div>
-            <span className="font-mono-num text-[11px] font-extrabold text-emerald-700 shrink-0">
-              {p.bankrupt ? 'ล้มละลาย' : `฿${p.cash.toLocaleString()}`}
-            </span>
+
+            <div className="mt-1 pt-1 border-t border-[#EFE5D0] flex items-center justify-between gap-1 text-[10px] font-bold text-slate-500">
+              <span className="inline-flex items-center gap-0.5 text-slate-600">
+                <Home className="h-2.5 w-2.5 text-amber-600" />
+                <span>ที่ดิน {ownedCount}</span>
+              </span>
+              <span className="font-mono-num text-sky-700 font-extrabold">
+                สุทธิ ฿{netWorth.toLocaleString()}
+              </span>
+            </div>
 
             <AnimatePresence>
               {pops.map((pop) => (
@@ -400,54 +424,72 @@ export const BottomMonopolyDock: React.FC<BottomMonopolyDockProps> = ({
   return (
     <nav
       aria-label="แถบคำสั่งเกม"
-      className="w-full max-w-3xl mx-auto px-1.5 min-[380px]:px-2 sm:px-4 pb-2 min-[380px]:pb-2.5 sm:pb-3.5 pt-1.5 relative shrink-0"
+      className="w-full max-w-3xl mx-auto px-1.5 min-[380px]:px-2 sm:px-4 pb-2 min-[380px]:pb-2.5 sm:pb-3.5 pt-2 relative shrink-0"
     >
       {/* Cream & Gold Menu Bar flanking the Hero Diamond GO Button */}
-      <div className="relative rounded-2xl bg-[#FAF6EE] border-2 border-[#F5C542] border-b-[5px] border-b-[#D49B1A] px-1 min-[380px]:px-2 sm:px-4 py-1.5 sm:py-2 shadow-lg grid grid-cols-5 items-center gap-0.5 min-[380px]:gap-1 sm:gap-2">
+      <div className="relative rounded-2xl sm:rounded-3xl bg-[#FAF6EE] border-2 border-[#F5C542] border-b-[5px] border-b-[#D49B1A] px-1.5 min-[380px]:px-2.5 sm:px-4 py-2 sm:py-2.5 shadow-lg grid grid-cols-5 items-center gap-0.5 min-[380px]:gap-1 sm:gap-2">
         {/* Left Menu 1: กติกา */}
         <button
           type="button"
           onClick={onOpenRules}
-          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-0.5 min-[380px]:py-1.5 min-[380px]:px-1 text-slate-700 hover:bg-amber-100/70 transition-colors"
+          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 text-slate-700 hover:bg-amber-100/70 transition-colors"
         >
-          <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
-          <span className="text-[9px] min-[380px]:text-[10px] sm:text-xs font-extrabold whitespace-nowrap">กติกา</span>
+          <BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />
+          <span className="text-[10px] min-[380px]:text-[11px] sm:text-xs font-extrabold whitespace-nowrap">กติกา</span>
         </button>
 
         {/* Left Menu 2: บันทึก */}
         <button
           type="button"
           onClick={onOpenLogs}
-          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-0.5 min-[380px]:py-1.5 min-[380px]:px-1 text-slate-700 hover:bg-sky-100/70 transition-colors"
+          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 text-slate-700 hover:bg-sky-100/70 transition-colors"
         >
-          <ScrollText className="h-4 w-4 sm:h-5 sm:w-5 text-sky-600" />
-          <span className="text-[9px] min-[380px]:text-[10px] sm:text-xs font-extrabold whitespace-nowrap">บันทึก</span>
+          <ScrollText className="h-5 w-5 sm:h-6 sm:w-6 text-sky-600" />
+          <span className="text-[10px] min-[380px]:text-[11px] sm:text-xs font-extrabold whitespace-nowrap">บันทึก</span>
         </button>
 
         {/* Center Spacer for Protruding Giant Diamond Roll Button */}
-        <div className="flex items-center justify-center relative h-9 min-[380px]:h-10 sm:h-11">
+        <div className="flex items-center justify-center relative h-11 min-[380px]:h-12 sm:h-13">
           <motion.button
             type="button"
             disabled={!canRoll}
             onClick={onRollDice}
             data-testid="roll-dice-btn"
             aria-label={canRoll ? 'ทอยเต๋า GO' : `รอตา ${currentPlayer?.name ?? ''}`}
-            whileHover={canRoll ? { scale: 1.06 } : undefined}
+            animate={
+              canRoll
+                ? { scale: [1.03, 1.1, 1.03] }
+                : { scale: 1 }
+            }
+            transition={
+              canRoll
+                ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+                : { duration: 0.2 }
+            }
+            whileHover={canRoll ? { scale: 1.12 } : undefined}
             whileTap={canRoll ? { scale: 0.94, y: 3 } : undefined}
-            className="group relative -top-2 min-[380px]:-top-2.5 sm:-top-3 focus-visible:outline-none cursor-pointer disabled:cursor-default"
+            className="group relative -top-3 min-[380px]:-top-3.5 sm:-top-4 focus-visible:outline-none cursor-pointer disabled:cursor-default"
           >
+            {/* Glowing Breathing Aura on Your Turn */}
+            {canRoll && (
+              <span
+                className="absolute inset-0 rotate-45 rounded-2xl bg-amber-300/65 blur-md animate-pulse pointer-events-none"
+                aria-hidden="true"
+              />
+            )}
+
             {/* Rotated Diamond Frame */}
             <div
-              className={`h-14 w-14 min-[380px]:h-16 min-[380px]:w-16 sm:h-20 sm:w-20 rotate-45 rounded-xl min-[380px]:rounded-2xl border-[3px] min-[380px]:border-4 border-white flex items-center justify-center transition-all ${
+              className={`relative h-16 w-16 min-[380px]:h-[72px] min-[380px]:w-[72px] sm:h-[88px] sm:w-[88px] rotate-45 rounded-2xl border-[3px] min-[380px]:border-4 border-white flex items-center justify-center transition-all ${
                 canRoll
-                  ? 'bg-gradient-to-br from-[#FF6B35] via-[#F43F5E] to-[#E11D48] shadow-[0_6px_0_#9F1239,0_10px_18px_rgba(159,18,57,0.35)] sm:shadow-[0_7px_0_#9F1239,0_12px_20px_rgba(159,18,57,0.35)]'
+                  ? 'bg-gradient-to-br from-[#FF6B35] via-[#F43F5E] to-[#E11D48] shadow-[0_6px_0_#9F1239,0_0_24px_rgba(244,63,94,0.55)] sm:shadow-[0_8px_0_#9F1239,0_0_28px_rgba(244,63,94,0.6)] ring-2 ring-amber-300/80'
                   : 'bg-gradient-to-br from-amber-400 to-amber-500 shadow-[0_5px_0_#B45309] opacity-90'
               }`}
             >
               {/* Upright Content inside Diamond */}
               <div className="-rotate-45 flex flex-col items-center justify-center text-white leading-none">
-                <Dices className="h-4 w-4 min-[380px]:h-5 min-[380px]:w-5 sm:h-6 sm:w-6 drop-shadow-xs" />
-                <span className="mt-0.5 text-[9.5px] min-[380px]:text-[11px] sm:text-xs font-black tracking-wide drop-shadow-xs whitespace-nowrap">
+                <Dices className="h-5 w-5 min-[380px]:h-6 min-[380px]:w-6 sm:h-7 sm:w-7 drop-shadow-xs" />
+                <span className="mt-0.5 text-[10.5px] min-[380px]:text-xs sm:text-sm font-black tracking-wide drop-shadow-xs whitespace-nowrap">
                   {canRoll ? 'ทอยเต๋า' : gameState.phase === 'ROLLING' ? 'กำลังทอย' : 'GO'}
                 </span>
               </div>
@@ -459,22 +501,22 @@ export const BottomMonopolyDock: React.FC<BottomMonopolyDockProps> = ({
         <button
           type="button"
           onClick={onOpenFrequency}
-          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-0.5 min-[380px]:py-1.5 min-[380px]:px-1 text-slate-700 hover:bg-emerald-100/70 transition-colors"
+          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 text-slate-700 hover:bg-emerald-100/70 transition-colors"
         >
-          <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-          <span className="hidden min-[380px]:inline text-[10px] sm:text-xs font-extrabold whitespace-nowrap">ตารางความถี่</span>
-          <span className="min-[380px]:hidden text-[9px] font-extrabold whitespace-nowrap">ความถี่</span>
+          <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+          <span className="hidden min-[380px]:inline text-[11px] sm:text-xs font-extrabold whitespace-nowrap">ตารางความถี่</span>
+          <span className="min-[380px]:hidden text-[10px] font-extrabold whitespace-nowrap">ความถี่</span>
         </button>
 
         {/* Right Menu 2: สถิติผู้เล่น */}
         <button
           type="button"
           onClick={onOpenPlayerStats}
-          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1 px-0.5 min-[380px]:py-1.5 min-[380px]:px-1 text-slate-700 hover:bg-rose-100/70 transition-colors"
+          className="flex flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 px-1 text-slate-700 hover:bg-rose-100/70 transition-colors"
         >
-          <Users className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500" />
-          <span className="hidden min-[380px]:inline text-[10px] sm:text-xs font-extrabold whitespace-nowrap">สถิติผู้เล่น</span>
-          <span className="min-[380px]:hidden text-[9px] font-extrabold whitespace-nowrap">สถิติ</span>
+          <Users className="h-5 w-5 sm:h-6 sm:w-6 text-rose-500" />
+          <span className="hidden min-[380px]:inline text-[11px] sm:text-xs font-extrabold whitespace-nowrap">สถิติผู้เล่น</span>
+          <span className="min-[380px]:hidden text-[10px] font-extrabold whitespace-nowrap">สถิติ</span>
         </button>
       </div>
     </nav>

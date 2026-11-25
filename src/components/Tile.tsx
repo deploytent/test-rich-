@@ -21,8 +21,8 @@ const GROUP_BAND_HEX: Record<Exclude<PropertyGroup, 'utility'>, string> = {
 };
 
 function renderTileVectorIcon(tile: TileConfig) {
-  const propIconCls = 'h-4 w-4 @[360px]:h-5 @[360px]:w-5 @[460px]:h-7 @[460px]:w-7';
-  const specialIconCls = 'h-5 w-5 @[360px]:h-6 @[360px]:w-6 @[460px]:h-8 @[460px]:w-8';
+  const propIconCls = 'h-5 w-5 @[360px]:h-6 @[360px]:w-6 @[460px]:h-8 @[460px]:w-8';
+  const specialIconCls = 'h-6 w-6 @[360px]:h-7 @[360px]:w-7 @[460px]:h-9 @[460px]:w-9';
 
   switch (tile.id) {
     case 1: // START
@@ -63,7 +63,7 @@ function renderTileVectorIcon(tile: TileConfig) {
       );
     case 5: // Research Lab
       return (
-        <svg viewBox="0 0 44 40" className="h-5 w-6 @[360px]:h-6 @[360px]:w-7 @[460px]:h-8 @[460px]:w-9" aria-hidden="true">
+        <svg viewBox="0 0 44 40" className="h-6 w-7 @[360px]:h-7 @[360px]:w-8 @[460px]:h-9 @[460px]:w-10" aria-hidden="true">
           <polygon points="22,6 38,14 22,22 6,14" fill="#C7D2FE" />
           <polygon points="6,14 22,22 22,36 6,28" fill="#818CF8" />
           <polygon points="38,14 22,22 22,36 38,28" fill="#6366F1" />
@@ -214,7 +214,7 @@ export const Tile: React.FC<TileProps> = ({
         {hasPriceBar ? (
           <div
             style={{ backgroundColor: ownerMeta ? ownerMeta.hex : bandHex }}
-            className="flex items-center justify-between gap-0.5 px-1 @[460px]:px-1.5 py-0.5 @[460px]:py-1 text-[8px] @[360px]:text-[9px] @[460px]:text-[11px] font-extrabold text-white leading-none shadow-xs"
+            className="flex items-center justify-between gap-0.5 px-1 @[460px]:px-1.5 py-0.5 @[460px]:py-1 text-[9.5px] @[360px]:text-[10.5px] @[460px]:text-[12.5px] font-extrabold text-white leading-none shadow-xs"
           >
             <span className="font-mono-num truncate drop-shadow-[0_1px_1px_rgba(0,0,0,0.22)]">
               {ownerMeta
@@ -222,14 +222,14 @@ export const Tile: React.FC<TileProps> = ({
                 : `฿${(tile.price ?? 0).toLocaleString()}`}
             </span>
             {level > 0 && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600 border border-white/80 px-1 py-0.5 text-[7px] @[360px]:text-[8px] @[460px]:text-[9px] font-extrabold text-white shrink-0 shadow-xs">
-                <Home className="h-2 w-2 @[460px]:h-2.5 @[460px]:w-2.5 fill-white" />
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600 border border-white/80 px-1 py-0.5 text-[8px] @[360px]:text-[9px] @[460px]:text-[10px] font-extrabold text-white shrink-0 shadow-xs">
+                <Home className="h-2.5 w-2.5 @[460px]:h-3 @[460px]:w-3 fill-white" />
                 <span>{level}</span>
               </span>
             )}
           </div>
         ) : (
-          <div className="px-1 @[460px]:px-1.5 pt-0.5 flex items-center justify-between text-[7.5px] @[360px]:text-[8.5px] @[460px]:text-[10px] font-mono-num font-extrabold text-amber-700/60 leading-none">
+          <div className="px-1 @[460px]:px-1.5 pt-0.5 flex items-center justify-between text-[8.5px] @[360px]:text-[9.5px] @[460px]:text-[11px] font-mono-num font-extrabold text-amber-700/65 leading-none">
             <span>#{tile.id}</span>
           </div>
         )}
@@ -242,11 +242,11 @@ export const Tile: React.FC<TileProps> = ({
         {/* Crisp Bottom Label */}
         <div className="px-0.5 @[460px]:px-1.5 pb-0.5 @[460px]:pb-1 flex items-center justify-center">
           {isColoredProperty || tile.type === 'utility' ? (
-            <p className="text-[7.5px] @[360px]:text-[9px] @[460px]:text-[11px] font-extrabold text-slate-800 text-center leading-tight tracking-tighter @[460px]:tracking-normal line-clamp-1">
+            <p className="text-[9px] @[360px]:text-[10.5px] @[460px]:text-[12.5px] font-extrabold text-slate-800 text-center leading-tight tracking-tighter @[460px]:tracking-normal line-clamp-1">
               {tile.shortName}
             </p>
           ) : (
-            <span className="inline-block max-w-full truncate rounded-full bg-[#FAF2E0] border border-[#E6D7B9] px-1 @[360px]:px-1.5 @[460px]:px-2 py-0.5 text-[7px] @[360px]:text-[8px] @[460px]:text-[10px] font-extrabold text-slate-700 leading-none tracking-tighter @[460px]:tracking-normal">
+            <span className="inline-block max-w-full truncate rounded-full bg-[#FAF2E0] border border-[#E6D7B9] px-1 @[460px]:px-2 py-0.5 text-[8px] @[360px]:text-[9px] @[460px]:text-[11px] font-extrabold text-slate-700 leading-none tracking-tighter @[460px]:tracking-normal">
               {tile.shortName}
             </span>
           )}

@@ -85,10 +85,10 @@ const SIZE_CLASSES: Record<
     shadowPx: 8,
   },
   board: {
-    box: 'h-4 w-4 @[380px]:h-5 @[380px]:w-5 @[460px]:h-7 @[460px]:w-7 border-[1.5px] @[460px]:border-2',
-    icon: 'h-2.5 w-2.5 @[380px]:h-3 @[380px]:w-3 @[460px]:h-4 @[460px]:w-4',
-    rimPx: 3,
-    shadowPx: 6,
+    box: 'h-5 w-5 @[380px]:h-6 @[380px]:w-6 @[460px]:h-8 @[460px]:w-8 border-2',
+    icon: 'h-3 w-3 @[380px]:h-3.5 @[380px]:w-3.5 @[460px]:h-4.5 @[460px]:w-4.5',
+    rimPx: 3.5,
+    shadowPx: 7,
   },
 };
 
