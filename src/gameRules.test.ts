@@ -4,7 +4,9 @@ import {
   advanceBoardPosition,
   calculateNetWorth,
   calculateRent,
+  changePlayerColorInRoom,
   computeDiceStats,
+  createEmptyDiceCounts,
   evaluateGameEnd,
   findNextTurn,
   generateRoomCode,
@@ -14,8 +16,12 @@ import {
   getTakeoverCost,
   GROUP_MONOPOLY_BONUS,
   hasGroupMonopoly,
+  pickAvailableTokenColor,
+  pickRandomAvailableColor,
+  pickRandomPlayerName,
+  RANDOM_PLAYER_NAMES,
 } from './gameRules';
-import type { Player, PropertyState, TileConfig } from './types';
+import type { GameState, Player, PropertyState, TileConfig } from './types';
 
 const sampleTiles: TileConfig[] = [
   { id: 1, name: 'จุดเริ่มต้น', shortName: 'เริ่มต้น', type: 'start', description: '' },
@@ -248,6 +254,77 @@ test('getStepPath generates exact tile-by-tile sequence and detects Start crossi
     { pos: 2, passedStart: false },
     { pos: 3, passedStart: false },
   ]);
+});
+
+test('RANDOM_PLAYER_NAMES has 20+ unique names and pickRandomPlayerName selects from them', () => {
+  assert.ok(RANDOM_PLAYER_NAMES.length >= 20);
+  assert.equal(new Set(RANDOM_PLAYER_NAMES).size, RANDOM_PLAYER_NAMES.length);
+  const picked = new Set<string>();
+  for (let i = 0; i < RANDOM_PLAYER_NAMES.length; i++) {
+    const name = pickRandomPlayerName(() => i / RANDOM_PLAYER_NAMES.length);
+    assert.ok(RANDOM_PLAYER_NAMES.includes(name));
+    picked.add(name);
+  }
+  assert.equal(picked.size, RANDOM_PLAYER_NAMES.length);
+});
+
+test('pickAvailableTokenColor, pickRandomAvailableColor, and changePlayerColorInRoom prevent duplicate colors', () => {
+  const players: Player[] = [
+    { id: 'p1', name: 'หัวหน้า', color: 'red', isBot: false, position: 1, cash: 20000, inLab: false, labTurns: 0, bankrupt: false, quizCorrect: 0, quizTotal: 0, modeBonusesEarned: 0 },
+    { id: 'p2', name: 'บอท 1', color: 'blue', isBot: true, position: 1, cash: 20000, inLab: false, labTurns: 0, bankrupt: false, quizCorrect: 0, quizTotal: 0, modeBonusesEarned: 0 },
+  ];
+
+  // Auto-switch colliding preferred color 'red' -> 'green'
+  assert.equal(pickAvailableTokenColor(players, 'red'), 'green');
+  assert.equal(pickAvailableTokenColor(players, 'yellow'), 'yellow');
+
+  // Random bot color picks ONLY among ['green', 'yellow']
+  assert.equal(pickRandomAvailableColor(players, () => 0), 'green');
+  assert.equal(pickRandomAvailableColor(players, () => 0.99), 'yellow');
+
+  const fullPlayers: Player[] = [
+    ...players,
+    { id: 'p3', name: 'P3', color: 'green', isBot: false, position: 1, cash: 20000, inLab: false, labTurns: 0, bankrupt: false, quizCorrect: 0, quizTotal: 0, modeBonusesEarned: 0 },
+    { id: 'p4', name: 'P4', color: 'yellow', isBot: true, position: 1, cash: 20000, inLab: false, labTurns: 0, bankrupt: false, quizCorrect: 0, quizTotal: 0, modeBonusesEarned: 0 },
+  ];
+  assert.equal(pickRandomAvailableColor(fullPlayers), null);
+
+  const mockRoom: GameState = {
+    roomCode: 'ABC234',
+    isOnline: true,
+    hostId: 'p1',
+    status: 'waiting',
+    curriculumMode: 'mode1',
+    maxRounds: 15,
+    currentRound: 1,
+    turnIndex: 0,
+    phase: 'IDLE',
+    turnStartedAt: 0,
+    players,
+    properties: {},
+    diceCounts: createEmptyDiceCounts(),
+    totalRolls: 0,
+    lastDice: null,
+    speechMessage: '',
+    pendingAction: null,
+    activeQuiz: null,
+    activeUpgradeChallenge: null,
+    usedQuestionIds: [],
+    logs: [],
+    winnerId: null,
+    endReason: null,
+  };
+
+  // p1 cannot take p2's blue color
+  const blocked = changePlayerColorInRoom(mockRoom, 'p1', 'blue');
+  assert.equal(blocked.changed, false);
+  assert.ok(blocked.reason?.includes('บอท 1'));
+  assert.equal(blocked.state.players[0].color, 'red');
+
+  // p1 can switch to free yellow color
+  const allowed = changePlayerColorInRoom(mockRoom, 'p1', 'yellow');
+  assert.equal(allowed.changed, true);
+  assert.equal(allowed.state.players[0].color, 'yellow');
 });
 
 

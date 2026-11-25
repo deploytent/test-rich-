@@ -4,7 +4,9 @@ import { ScrollText, X } from 'lucide-react';
 import { isFirebaseConfigured, rtdb } from './firebaseConfig';
 import { getBoardTiles, pickQuizQuestionWithHistory, pickUpgradeChallenge } from './gameData';
 import {
+  ALL_TOKEN_COLORS,
   calculateRent,
+  changePlayerColorInRoom,
   computeDiceStats,
   createEmptyDiceCounts,
   createInitialProperties,
@@ -17,6 +19,9 @@ import {
   getTakeoverCost,
   LAB_BAIL_COST,
   MODE_BONUS_AMOUNT,
+  pickAvailableTokenColor,
+  pickRandomAvailableColor,
+  pickRandomPlayerName,
   QUIZ_PENALTY,
   QUIZ_REWARD,
   START_PASS_BONUS,
@@ -62,8 +67,6 @@ import { UpgradeModal } from './components/UpgradeModal';
 import { ActionModal } from './components/ActionModal';
 import { RulesModal } from './components/RulesModal';
 import { SummaryModal } from './components/SummaryModal';
-
-const ALL_COLORS: TokenColor[] = ['red', 'blue', 'green', 'yellow'];
 
 function makeLog(round: number, message: string, tone: LogEntry['tone'] = 'info'): LogEntry {
   return {
@@ -141,10 +144,20 @@ export default function App() {
     return created;
   });
 
-  const [playerName, setPlayerName] = useState<string>('นักสถิติมือทอง');
-  const [playerColor, setPlayerColor] = useState<TokenColor>('blue');
-  const [curriculumMode, setCurriculumMode] = useState<CurriculumMode>('mode3');
+  const [playerName, setPlayerName] = useState<string>(() => pickRandomPlayerName());
+  const [playerColor, setPlayerColor] = useState<TokenColor>('red');
+  const [curriculumMode, setCurriculumMode] = useState<CurriculumMode>('mode1');
   const [maxRounds, setMaxRounds] = useState<10 | 15 | 20>(15);
+
+  const handleRandomizeName = useCallback(() => {
+    setPlayerName((prev) => {
+      let next = pickRandomPlayerName();
+      for (let i = 0; i < 4 && next === prev; i++) {
+        next = pickRandomPlayerName();
+      }
+      return next;
+    });
+  }, []);
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [onlineError, setOnlineError] = useState<string | null>(null);
@@ -280,7 +293,7 @@ export default function App() {
   const handleStartSolo = useCallback(
     (botCount: 1 | 2 | 3, difficulty: BotDifficulty, rounds: 10 | 15 | 20) => {
       setLastSoloConfig({ botCount, difficulty, rounds });
-      const availableColors = ALL_COLORS.filter((c) => c !== playerColor);
+      const availableColors = ALL_TOKEN_COLORS.filter((c) => c !== playerColor);
       const human: Player = {
         id: localPlayerId,
         name: playerName.trim() || 'ผู้เล่น 1',
@@ -385,8 +398,8 @@ export default function App() {
       const taken = room.players.map((p) => p.color);
       setTakenColorsInJoinRoom(taken);
       if (taken.includes(playerColor)) {
-        const free = ALL_COLORS.find((c) => !taken.includes(c));
-        if (free) setPlayerColor(free);
+        const free = pickAvailableTokenColor(room.players, playerColor);
+        setPlayerColor(free);
       }
     } catch {
       setTakenColorsInJoinRoom([]);
@@ -496,10 +509,10 @@ export default function App() {
       }
 
       if (!alreadyIn) {
-        const taken = room.players.map((p) => p.color);
-        const chosenColor = taken.includes(playerColor)
-          ? ALL_COLORS.find((c) => !taken.includes(c)) ?? playerColor
-          : playerColor;
+        const chosenColor = pickAvailableTokenColor(room.players, playerColor);
+        if (chosenColor !== playerColor) {
+          setPlayerColor(chosenColor);
+        }
 
         const newPlayer: Player = {
           id: localPlayerId,
@@ -524,6 +537,8 @@ export default function App() {
         await set(ref(rtdb, `rooms/${code}`), cleanForFirebase(updated));
         setGameState(updated);
       } else {
+        const existing = room.players.find((p) => p.id === localPlayerId);
+        if (existing) setPlayerColor(existing.color);
         setGameState(room);
       }
     } catch (err) {
@@ -533,10 +548,46 @@ export default function App() {
     }
   };
 
+  const handleChangeOnlineColor = async (nextColor: TokenColor) => {
+    setOnlineError(null);
+    if (!gameState || !gameState.isOnline || gameState.status !== 'waiting' || !gameState.roomCode) {
+      return;
+    }
+
+    const localCheck = changePlayerColorInRoom(gameState, localPlayerId, nextColor);
+    if (!localCheck.changed) {
+      if (localCheck.reason) setOnlineError(localCheck.reason);
+      return;
+    }
+
+    if (isFirebaseConfigured && rtdb) {
+      try {
+        const snap = await get(ref(rtdb, `rooms/${gameState.roomCode}`));
+        const latest = snap.exists() ? sanitizeFirebaseState(snap.val()) ?? gameState : gameState;
+        const latestRes = changePlayerColorInRoom(latest, localPlayerId, nextColor);
+        if (!latestRes.changed) {
+          if (latestRes.reason) setOnlineError(latestRes.reason);
+          setGameState(latest);
+          return;
+        }
+        await set(ref(rtdb, `rooms/${gameState.roomCode}`), cleanForFirebase(latestRes.state));
+        setGameState(latestRes.state);
+        setPlayerColor(nextColor);
+      } catch (err) {
+        setOnlineError(
+          `ไม่สามารถเปลี่ยนสีตัวหมากได้: ${err instanceof Error ? err.message : 'เกิดข้อผิดพลาด'}`
+        );
+      }
+    } else {
+      setGameState(localCheck.state);
+      setPlayerColor(nextColor);
+    }
+  };
+
   const handleAddOnlineBot = () => {
     if (!gameState || !gameState.isOnline || gameState.players.length >= 4) return;
-    const takenColors = new Set(gameState.players.map((p) => p.color));
-    const freeColor = ALL_COLORS.find((c) => !takenColors.has(c)) ?? 'red';
+    const freeColor = pickRandomAvailableColor(gameState.players);
+    if (!freeColor) return;
     const botIdx = gameState.players.filter((p) => p.isBot).length;
     const bot: Player = {
       id: `bot-${Date.now()}-${botIdx}`,
@@ -1589,6 +1640,7 @@ export default function App() {
         <Lobby
           playerName={playerName}
           setPlayerName={setPlayerName}
+          onRandomizeName={handleRandomizeName}
           playerColor={playerColor}
           setPlayerColor={setPlayerColor}
           curriculumMode={curriculumMode}
@@ -1598,9 +1650,11 @@ export default function App() {
           onlineRoom={gameState}
           localPlayerId={localPlayerId}
           onlineError={onlineError}
+          onClearOnlineError={() => setOnlineError(null)}
           onStartSolo={handleStartSolo}
           onCreateOnlineRoom={handleCreateOnlineRoom}
           onJoinOnlineRoom={handleJoinOnlineRoom}
+          onChangeOnlineColor={handleChangeOnlineColor}
           onAddOnlineBot={handleAddOnlineBot}
           onStartOnlineGame={handleStartOnlineGame}
           onLeaveOnlineRoom={handleLeaveOnlineRoom}

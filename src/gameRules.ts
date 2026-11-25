@@ -18,6 +18,91 @@ export const WARP_COST = 1000;
 export const TAX_AMOUNT = 2000;
 export const GROUP_MONOPOLY_BONUS = 500;
 
+export const ALL_TOKEN_COLORS: TokenColor[] = ['red', 'blue', 'green', 'yellow'];
+
+export const RANDOM_PLAYER_NAMES: string[] = [
+  'เจ้าพ่อฐานนิยม',
+  'เซียนความถี่',
+  'เศรษฐีกราฟแท่ง',
+  'นักสุ่มตัวอย่าง',
+  'ปรมาจารย์พารามิเตอร์',
+  'เจ้าหญิงค่าสถิติ',
+  'ราชาแผนภูมิ',
+  'นักสำรวจข้อมูล',
+  'เศรษฐีพันล้าน',
+  'จอมวางแผน',
+  'อัจฉริยะร้อยละ',
+  'เจ้าสัวตารางถี่',
+  'นายกประชากร',
+  'มือโปรทวินัย',
+  'นักวิเคราะห์ทองคำ',
+  'ราชินีตัวแปร',
+  'ปราชญ์ข้อมูลดิบ',
+  'มหาเศรษฐีสถิติ',
+  'ยอดเซียนตัวอย่าง',
+  'เทพเจ้าวงกลม',
+  'ผู้พิชิตค่าเฉลี่ย',
+  'ขุนแผนข้อมูล',
+  'กูรูเชิงคุณภาพ',
+  'เจ้าสำนักวิจัย',
+];
+
+export function pickRandomPlayerName(rng: () => number = Math.random): string {
+  const idx = Math.floor(rng() * RANDOM_PLAYER_NAMES.length);
+  return RANDOM_PLAYER_NAMES[idx] ?? RANDOM_PLAYER_NAMES[0];
+}
+
+export function pickAvailableTokenColor(
+  players: Pick<Player, 'color'>[],
+  preferred: TokenColor = 'red'
+): TokenColor {
+  const taken = new Set(players.map((p) => p.color));
+  if (!taken.has(preferred)) return preferred;
+  return ALL_TOKEN_COLORS.find((c) => !taken.has(c)) ?? preferred;
+}
+
+export function pickRandomAvailableColor(
+  players: Pick<Player, 'color'>[],
+  rng: () => number = Math.random
+): TokenColor | null {
+  const taken = new Set(players.map((p) => p.color));
+  const free = ALL_TOKEN_COLORS.filter((c) => !taken.has(c));
+  if (free.length === 0) return null;
+  const idx = Math.floor(rng() * free.length);
+  return free[idx] ?? free[0];
+}
+
+export function changePlayerColorInRoom(
+  state: GameState,
+  playerId: string,
+  nextColor: TokenColor
+): { state: GameState; changed: boolean; reason?: string } {
+  const target = state.players.find((p) => p.id === playerId);
+  if (!target) {
+    return { state, changed: false, reason: 'ไม่พบผู้เล่นในห้อง' };
+  }
+  if (target.color === nextColor) {
+    return { state, changed: false };
+  }
+  const takenByOther = state.players.find((p) => p.id !== playerId && p.color === nextColor);
+  if (takenByOther) {
+    return {
+      state,
+      changed: false,
+      reason: `สีนี้ถูกเลือกแล้วโดย ${takenByOther.name}`,
+    };
+  }
+  return {
+    changed: true,
+    state: {
+      ...state,
+      players: state.players.map((p) =>
+        p.id === playerId ? { ...p, color: nextColor } : p
+      ),
+    },
+  };
+}
+
 export const COLOR_META: Record<
   TokenColor,
   { label: string; hex: string; ring: string; bgClass: string; textClass: string }

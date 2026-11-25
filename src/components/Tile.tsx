@@ -3,6 +3,29 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Home } from 'lucide-react';
 import type { GamePhase, MoneyPopup, Player, PropertyGroup, PropertyState, TileConfig } from '../types';
 import { COLOR_META } from '../gameRules';
+import { Token3D } from './Token3D';
+
+function getTokenStackOffset(index: number, total: number): { xPct: number; yPct: number } {
+  if (total <= 1) return { xPct: 0, yPct: 0 };
+  if (total === 2) {
+    return index === 0 ? { xPct: -36, yPct: -18 } : { xPct: 36, yPct: 20 };
+  }
+  if (total === 3) {
+    const coords = [
+      { xPct: -40, yPct: -26 },
+      { xPct: 40, yPct: -22 },
+      { xPct: 0, yPct: 30 },
+    ];
+    return coords[index] ?? { xPct: 0, yPct: 0 };
+  }
+  const coords = [
+    { xPct: -36, yPct: -28 },
+    { xPct: 36, yPct: -26 },
+    { xPct: -34, yPct: 28 },
+    { xPct: 34, yPct: 30 },
+  ];
+  return coords[index] ?? { xPct: 0, yPct: 0 };
+}
 
 interface TileProps {
   tile: TileConfig;
@@ -269,19 +292,26 @@ export const Tile: React.FC<TileProps> = ({
         </div>
       </div>
 
-      {/* Player 3D Puck Tokens Overlay + Step Hop + Glow + Floating Money Text */}
+      {/* Player 3D Tactile Tokens Overlay + Offset Stacking + Idle Float + Step Hop + Floating Money Text */}
       {playersHere.length > 0 && (
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20 overflow-visible">
-          <div className="flex flex-wrap items-center justify-center gap-0.5 @[460px]:gap-1 p-0.5 @[380px]:p-1 overflow-visible">
-            {playersHere.map((p) => {
-              const c = COLOR_META[p.color];
-              const isActiveToken = p.id === activePlayerId;
-              const isStepping = phase === 'MOVING' && isActiveToken;
-              const tokenPopups = moneyPopups.filter((m) => m.playerId === p.id);
+          {playersHere.map((p, idx) => {
+            const c = COLOR_META[p.color];
+            const isActiveToken = p.id === activePlayerId;
+            const isStepping = phase === 'MOVING' && isActiveToken;
+            const tokenPopups = moneyPopups.filter((m) => m.playerId === p.id);
+            const offset = getTokenStackOffset(idx, playersHere.length);
 
-              return (
+            return (
+              <div
+                key={p.id}
+                className="absolute flex items-center justify-center overflow-visible"
+                style={{
+                  transform: `translate(${offset.xPct}%, ${offset.yPct}%)`,
+                  zIndex: isActiveToken ? 30 : 12 + idx,
+                }}
+              >
                 <motion.div
-                  key={p.id}
                   layoutId={`token-${p.id}`}
                   transition={{ type: 'spring', stiffness: 240, damping: 24 }}
                   title={p.name}
@@ -292,7 +322,7 @@ export const Tile: React.FC<TileProps> = ({
                     <motion.span
                       animate={{
                         scale: isStepping ? [1, 1.55, 1.1] : [1, 1.32, 1],
-                        opacity: isStepping ? [0.85, 0.35, 0.85] : [0.65, 0.25, 0.65],
+                        opacity: isStepping ? [0.85, 0.35, 0.85] : [0.6, 0.22, 0.6],
                       }}
                       transition={{
                         duration: isStepping
@@ -311,23 +341,30 @@ export const Tile: React.FC<TileProps> = ({
                     />
                   )}
 
-                  {/* Per-Tile Hop Bounce */}
+                  {/* Per-Tile Hop Bounce & Idle Floating */}
                   <motion.div
                     key={isStepping ? `hop-${p.id}-${p.position}` : `idle-${p.id}`}
                     initial={isStepping ? { y: 0, scale: 1 } : false}
                     animate={
                       isStepping
                         ? { y: [0, -14, 0], scale: [1, 1.24, 1] }
-                        : { y: 0, scale: 1 }
+                        : { y: [0, -2.5, 0], scale: 1 }
                     }
-                    transition={{
-                      duration: gameSpeed === 2 ? 0.24 : 0.48,
-                      ease: 'easeOut',
-                    }}
-                    className="relative h-3.5 w-3.5 @[380px]:h-5 @[380px]:w-5 @[460px]:h-6 @[460px]:w-6 rounded-full border-[1.5px] @[460px]:border-2 border-white shadow-[0_2px_0_rgba(0,0,0,0.35)] @[460px]:shadow-[0_3px_0_rgba(0,0,0,0.35)] flex items-center justify-center text-[7.5px] @[380px]:text-[9px] @[460px]:text-[10px] font-extrabold text-white"
-                    style={{ backgroundColor: c.hex }}
+                    transition={
+                      isStepping
+                        ? {
+                            duration: gameSpeed === 2 ? 0.24 : 0.48,
+                            ease: 'easeOut',
+                          }
+                        : {
+                            duration: 2.1,
+                            repeat: Infinity,
+                            ease: 'easeInOut',
+                            delay: idx * 0.28,
+                          }
+                    }
                   >
-                    {p.isBot ? p.name.replace('บอท', '').slice(0, 1) : p.name.slice(0, 1)}
+                    <Token3D color={p.color} size="board" showShadow />
                   </motion.div>
 
                   {/* Floating Money Text above Token */}
@@ -356,9 +393,9 @@ export const Tile: React.FC<TileProps> = ({
                     ))}
                   </AnimatePresence>
                 </motion.div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

@@ -15,9 +15,10 @@ import {
   X,
 } from 'lucide-react';
 import type { GameState, MoneyPopup, TileConfig } from '../types';
-import { calculateNetWorth, COLOR_META, getModeLabel } from '../gameRules';
+import { calculateNetWorth, getModeLabel } from '../gameRules';
 import { BanknoteStackIcon, MonopolyLogo } from './MonopolyLogo';
 import { FrequencyTracker } from './FrequencyTracker';
+import { Token3D } from './Token3D';
 import type { GameSpeed } from '../botLogic';
 
 interface TopMonopolyBarProps {
@@ -91,11 +92,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
           </div>
 
           {heroPlayer && (() => {
-            const meta = COLOR_META[heroPlayer.color];
             const isHeroTurn = heroPlayer.id === currentPlayerId && !heroPlayer.bankrupt;
-            const initial = heroPlayer.isBot
-              ? heroPlayer.name.replace('บอท', '').slice(0, 1)
-              : heroPlayer.name.slice(0, 1);
             return (
               <div
                 className={`relative flex items-center gap-1.5 min-[380px]:gap-2 rounded-xl min-[380px]:rounded-2xl px-2 py-1 border-2 transition-all overflow-visible min-w-0 ${
@@ -104,17 +101,12 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
                     : 'bg-[#FAF6EE] border-[#E6D7B9]'
                 }`}
               >
-                {/* Circular Avatar + Colored Puck */}
+                {/* 3D Token Avatar */}
                 <div className="relative flex items-center shrink-0">
-                  <div
-                    className="h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 sm:h-9 sm:w-9 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-[11px] min-[380px]:text-xs sm:text-sm font-extrabold text-white"
-                    style={{ backgroundColor: meta.hex }}
-                  >
-                    {initial}
-                  </div>
+                  <Token3D color={heroPlayer.color} size="md" />
                   {isHeroTurn && (
                     <span
-                      className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500 border-2 border-white"
+                      className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500 border-2 border-white z-20"
                       aria-hidden="true"
                     />
                   )}
@@ -142,7 +134,6 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
           {/* Compact Rival Player Chips (Desktop/Tablet) */}
           <div className="hidden sm:flex items-center gap-1.5 overflow-visible">
             {otherPlayers.map((p) => {
-              const meta = COLOR_META[p.color];
               const isActive = p.id === currentPlayerId && !p.bankrupt;
               return (
                 <div
@@ -156,10 +147,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
                   }`}
                   title={`${p.name} · มูลค่าสุทธิ ฿${calculateNetWorth(p, tiles, gameState.properties).toLocaleString()}`}
                 >
-                  <span
-                    className="h-4 w-4 rounded-full border-2 border-white shadow-xs shrink-0"
-                    style={{ backgroundColor: meta.hex }}
-                  />
+                  <Token3D color={p.color} size="xs" />
                   <div className="leading-none">
                     <p className="text-[10px] font-extrabold text-slate-700 truncate max-w-[66px]">
                       {p.name}
@@ -225,7 +213,6 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
       {otherPlayers.length > 0 && (
         <div className="sm:hidden mt-1.5 flex items-center justify-center gap-1.5 flex-wrap overflow-visible">
           {otherPlayers.map((p) => {
-            const meta = COLOR_META[p.color];
             const isActive = p.id === currentPlayerId && !p.bankrupt;
             return (
               <div
@@ -238,10 +225,7 @@ export const TopMonopolyBar: React.FC<TopMonopolyBarProps> = ({
                       : 'bg-[#FFFDF7]/95 border-[#E6D7B9]'
                 }`}
               >
-                <span
-                  className="h-3 w-3 rounded-full border border-white shrink-0"
-                  style={{ backgroundColor: meta.hex }}
-                />
+                <Token3D color={p.color} size="xs" />
                 <span className="font-extrabold text-slate-800 truncate max-w-[56px]">
                   {p.name}
                 </span>
@@ -457,7 +441,6 @@ export const PlayerStatsModal: React.FC<{
 
         <div className="overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-3">
           {gameState.players.map((p) => {
-            const meta = COLOR_META[p.color];
             const netWorth = calculateNetWorth(p, tiles, gameState.properties);
             const ownedTiles = tiles.filter(
               (t) => gameState.properties[t.id]?.ownerId === p.id
@@ -477,10 +460,7 @@ export const PlayerStatsModal: React.FC<{
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <span
-                      className="h-6 w-6 rounded-full border-2 border-white shadow-sm shrink-0"
-                      style={{ backgroundColor: meta.hex }}
-                    />
+                    <Token3D color={p.color} size="sm" />
                     <div>
                       <p className="text-sm font-extrabold text-slate-900">
                         {p.name}

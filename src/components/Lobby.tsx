@@ -13,6 +13,7 @@ import {
   Sparkles,
   Award,
   X,
+  Dices,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type {
@@ -21,13 +22,15 @@ import type {
   GameState,
   TokenColor,
 } from '../types';
-import { COLOR_META, getModeLabel } from '../gameRules';
+import { ALL_TOKEN_COLORS, COLOR_META, getModeLabel } from '../gameRules';
 import { isFirebaseConfigured } from '../firebaseConfig';
 import { BanknoteStackIcon, MonopolyLogo } from './MonopolyLogo';
+import { Token3D, TOKEN_SYMBOL_LABELS } from './Token3D';
 
 interface LobbyProps {
   playerName: string;
   setPlayerName: (name: string) => void;
+  onRandomizeName: () => void;
   playerColor: TokenColor;
   setPlayerColor: (color: TokenColor) => void;
   curriculumMode: CurriculumMode;
@@ -37,9 +40,11 @@ interface LobbyProps {
   onlineRoom: GameState | null;
   localPlayerId: string;
   onlineError: string | null;
+  onClearOnlineError: () => void;
   onStartSolo: (botCount: 1 | 2 | 3, difficulty: BotDifficulty, rounds: 10 | 15 | 20) => void;
   onCreateOnlineRoom: () => void;
   onJoinOnlineRoom: (code: string) => void;
+  onChangeOnlineColor: (color: TokenColor) => void;
   onAddOnlineBot: () => void;
   onStartOnlineGame: () => void;
   onLeaveOnlineRoom: () => void;
@@ -74,7 +79,7 @@ const CURRICULUM_OPTIONS: {
   },
 ];
 
-const ALL_COLORS: TokenColor[] = ['red', 'blue', 'green', 'yellow'];
+const ALL_COLORS: TokenColor[] = ALL_TOKEN_COLORS;
 
 const SkyMeadowBackdrop: React.FC = () => (
   <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
@@ -127,6 +132,7 @@ const SkyMeadowBackdrop: React.FC = () => (
 export const Lobby: React.FC<LobbyProps> = ({
   playerName,
   setPlayerName,
+  onRandomizeName,
   playerColor,
   setPlayerColor,
   curriculumMode,
@@ -136,9 +142,11 @@ export const Lobby: React.FC<LobbyProps> = ({
   onlineRoom,
   localPlayerId,
   onlineError,
+  onClearOnlineError,
   onStartSolo,
   onCreateOnlineRoom,
   onJoinOnlineRoom,
+  onChangeOnlineColor,
   onAddOnlineBot,
   onStartOnlineGame,
   onLeaveOnlineRoom,
@@ -148,6 +156,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 }) => {
   const [lobbyStep, setLobbyStep] = useState<'welcome' | 'setup'>('welcome');
   const [showSoloSetup, setShowSoloSetup] = useState(false);
+  const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
   const [botCount, setBotCount] = useState<1 | 2 | 3>(2);
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>('rookie');
@@ -156,14 +165,24 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [nameWarning, setNameWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    if (showCredits) {
+    if (onlineRoom?.status === 'waiting') {
+      setShowOnlineModal(false);
+    }
+  }, [onlineRoom?.status]);
+
+  useEffect(() => {
+    if (showCredits || showOnlineModal || showSoloSetup) {
       const onEsc = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setShowCredits(false);
+        if (e.key === 'Escape') {
+          setShowCredits(false);
+          setShowOnlineModal(false);
+          setShowSoloSetup(false);
+        }
       };
       window.addEventListener('keydown', onEsc);
       return () => window.removeEventListener('keydown', onEsc);
     }
-    if (onlineRoom?.status === 'waiting' || lobbyStep !== 'welcome' || showSoloSetup) return;
+    if (onlineRoom?.status === 'waiting' || lobbyStep !== 'welcome') return;
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
@@ -174,7 +193,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [lobbyStep, onlineRoom?.status, showSoloSetup, showCredits]);
+  }, [lobbyStep, onlineRoom?.status, showSoloSetup, showOnlineModal, showCredits]);
 
   const validateName = (): boolean => {
     if (!playerName.trim()) {
@@ -195,16 +214,15 @@ export const Lobby: React.FC<LobbyProps> = ({
   // ==================== WAITING LOBBY VIEW ====================
   if (onlineRoom && onlineRoom.status === 'waiting') {
     const isHost = onlineRoom.hostId === localPlayerId;
-    const takenColors = new Set(onlineRoom.players.map((p) => p.color));
 
     return (
-      <div className="relative min-h-screen flex items-center justify-center p-4 sm:p-8">
+      <div className="relative min-h-[100dvh] flex items-center justify-center p-3 sm:p-6">
         <SkyMeadowBackdrop />
-        <div className="relative z-10 w-full max-w-2xl rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] p-6 sm:p-8 shadow-2xl space-y-6 text-slate-800">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-[#E6D7B9] pb-5">
+        <div className="relative z-10 w-full max-w-2xl rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 text-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-[#E6D7B9] pb-4">
             <div>
               <p className="text-xs font-bold text-amber-700">ห้องรอเล่นออนไลน์</p>
-              <h1 className="text-2xl font-extrabold text-slate-900 mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5">
                 รหัสห้อง:{' '}
                 <span className="font-mono-num tracking-widest text-rose-600">
                   {onlineRoom.roomCode}
@@ -234,55 +252,118 @@ export const Lobby: React.FC<LobbyProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             {[0, 1, 2, 3].map((slotIdx) => {
               const p = onlineRoom.players[slotIdx];
               if (!p) {
                 return (
                   <div
                     key={slotIdx}
-                    className="flex items-center justify-between rounded-2xl border-2 border-dashed border-[#D8C6A0] bg-[#FFFDF7]/70 px-4 py-3.5 text-sm font-semibold text-slate-400"
+                    className="flex items-center justify-between rounded-2xl border-2 border-dashed border-[#D8C6A0] bg-[#FFFDF7]/70 px-4 py-3 text-sm font-semibold text-slate-400"
                   >
                     <span>ช่องผู้เล่น #{slotIdx + 1} (ว่าง)</span>
                   </div>
                 );
               }
-              const meta = COLOR_META[p.color];
+              const isSelf = p.id === localPlayerId;
               return (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between rounded-2xl border-2 border-[#E6D7B9] border-b-4 bg-[#FFFDF7] px-4 py-3.5"
+                  className={`flex items-center justify-between rounded-2xl border-2 border-b-4 px-3.5 py-2.5 ${
+                    isSelf
+                      ? 'border-amber-400 bg-amber-50/70'
+                      : 'border-[#E6D7B9] bg-[#FFFDF7]'
+                  }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className="h-6 w-6 rounded-full shrink-0 border-2 border-white shadow-[0_2px_0_rgba(0,0,0,0.28)]"
-                      style={{ backgroundColor: meta.hex }}
-                    />
-                    <span className="font-extrabold text-slate-900 truncate">{p.name}</span>
+                    <Token3D color={p.color} size="md" showShadow />
+                    <div className="min-w-0">
+                      <span className="block font-extrabold text-slate-900 truncate">
+                        {p.name}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {COLOR_META[p.color].label} · {TOKEN_SYMBOL_LABELS[p.color]}
+                      </span>
+                    </div>
                   </div>
                   <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 whitespace-nowrap">
                     {p.id === onlineRoom.hostId
                       ? 'หัวหน้าห้อง'
                       : p.isBot
                         ? 'บอท AI'
-                        : 'ผู้เล่น'}
+                        : isSelf
+                          ? 'คุณ'
+                          : 'ผู้เล่น'}
                   </span>
                 </div>
               );
             })}
           </div>
 
-          {takenColors.size > 0 && (
-            <p className="text-xs font-medium text-slate-600">
-              ผู้เล่นที่เข้าร่วมด้วยรหัส{' '}
-              <span className="font-mono-num font-extrabold text-slate-900">
-                {onlineRoom.roomCode}
-              </span>{' '}
-              จะถูกล็อกสีที่ถูกเลือกแล้วอัตโนมัติ
-            </p>
-          )}
+          {/* Real-Time Unique 3D Token Color Picker inside Waiting Lobby */}
+          <div className="rounded-2xl border-2 border-[#E6D7B9] bg-[#FFFDF7] p-3 sm:p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs sm:text-sm font-extrabold text-slate-800">
+                เลือกสีตัวหมาก 3D ของคุณ (อัปเดตเรียลไทม์ · ไม่ซ้ำกัน)
+              </p>
+            </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-[#E6D7B9] pt-5">
+            {onlineError && (
+              <p className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700">
+                {onlineError}
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {ALL_COLORS.map((c) => {
+                const meta = COLOR_META[c];
+                const owner = onlineRoom.players.find((pl) => pl.color === c);
+                const isMine = owner?.id === localPlayerId;
+                const isTakenByOther = Boolean(owner && owner.id !== localPlayerId);
+
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    data-testid={`waiting-color-${c}`}
+                    disabled={isTakenByOther}
+                    onClick={() => onChangeOnlineColor(c)}
+                    className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 p-2.5 text-center transition-all ${
+                      isTakenByOther
+                        ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-55 cursor-not-allowed'
+                        : isMine
+                          ? 'border-amber-500 border-b-4 bg-amber-50 text-slate-900 shadow-sm'
+                          : 'border-[#E6D7B9] bg-white hover:border-sky-400 hover:bg-sky-50/40 text-slate-700 cursor-pointer'
+                    }`}
+                  >
+                    <Token3D color={c} size="sm" showShadow={!isTakenByOther} />
+                    <div className="leading-tight">
+                      <p className="text-xs font-extrabold">
+                        {meta.label} ({TOKEN_SYMBOL_LABELS[c]})
+                      </p>
+                      <p
+                        className={`text-[10px] font-bold mt-0.5 truncate max-w-[120px] ${
+                          isMine
+                            ? 'text-amber-700'
+                            : isTakenByOther
+                              ? 'text-slate-500'
+                              : 'text-emerald-600'
+                        }`}
+                      >
+                        {isMine
+                          ? 'ตัวหมากของคุณ'
+                          : isTakenByOther
+                            ? `เลือกแล้วโดย ${owner!.name}`
+                            : 'ว่าง · กดเลือก'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t-2 border-[#E6D7B9] pt-4">
             <button
               type="button"
               onClick={onLeaveOnlineRoom}
@@ -455,18 +536,34 @@ export const Lobby: React.FC<LobbyProps> = ({
                 >
                   ชื่อผู้เล่น (Player Name)
                 </label>
-                <input
-                  id="player-name-input"
-                  type="text"
-                  maxLength={18}
-                  value={playerName}
-                  onChange={(e) => {
-                    setPlayerName(e.target.value);
-                    if (nameWarning) setNameWarning(null);
-                  }}
-                  placeholder="เช่น น้องซิกมา"
-                  className="w-full rounded-2xl border-2 border-[#E6D7B9] bg-[#FFFDF7] px-3 py-2 text-sm font-bold text-slate-900 placeholder-slate-400 focus:border-sky-400 focus:outline-none"
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="player-name-input"
+                    data-testid="player-name-input"
+                    type="text"
+                    maxLength={18}
+                    value={playerName}
+                    onChange={(e) => {
+                      setPlayerName(e.target.value);
+                      if (nameWarning) setNameWarning(null);
+                    }}
+                    placeholder="เช่น เจ้าพ่อฐานนิยม"
+                    className="flex-1 min-w-0 rounded-2xl border-2 border-[#E6D7B9] bg-[#FFFDF7] px-3 py-2 text-sm font-bold text-slate-900 placeholder-slate-400 focus:border-sky-400 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    data-testid="randomize-name-btn"
+                    onClick={() => {
+                      onRandomizeName();
+                      if (nameWarning) setNameWarning(null);
+                    }}
+                    title="สุ่มชื่อผู้เล่นใหม่"
+                    aria-label="สุ่มชื่อผู้เล่นใหม่"
+                    className="shrink-0 p-2 rounded-2xl border-2 border-[#E6D7B9] border-b-3 bg-white hover:bg-amber-50 text-amber-600 transition-colors cursor-pointer"
+                  >
+                    <Dices className="h-4 w-4" />
+                  </button>
+                </div>
                 {nameWarning && (
                   <p className="mt-1 text-xs font-bold text-rose-600">{nameWarning}</p>
                 )}
@@ -485,10 +582,11 @@ export const Lobby: React.FC<LobbyProps> = ({
                       <button
                         key={c}
                         type="button"
+                        data-testid={`setup-color-${c}`}
                         disabled={isTaken}
                         onClick={() => setPlayerColor(c)}
-                        aria-label={isTaken ? `${meta.label} (ถูกเลือกแล้ว)` : meta.label}
-                        className={`flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl border-2 py-1.5 text-[11px] sm:text-xs font-extrabold transition-all ${
+                        aria-label={isTaken ? `${meta.label} (ถูกเลือกแล้ว)` : `${meta.label} (${TOKEN_SYMBOL_LABELS[c]})`}
+                        className={`flex flex-col items-center justify-center gap-1 rounded-xl sm:rounded-2xl border-2 py-1.5 text-[11px] sm:text-xs font-extrabold transition-all ${
                           isTaken
                             ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed'
                             : active
@@ -496,10 +594,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                               : 'border-[#E6D7B9] bg-[#FFFDF7] text-slate-600 hover:border-amber-300'
                         }`}
                       >
-                        <span
-                          className="h-4 w-4 sm:h-5 sm:w-5 rounded-full border-2 border-white shadow-[0_2px_0_rgba(0,0,0,0.3)]"
-                          style={{ backgroundColor: meta.hex }}
-                        />
+                        <Token3D color={c} size="sm" showShadow={!isTaken} />
                         <span>{isTaken ? 'ถูกใช้' : meta.label.replace('สี', '')}</span>
                       </button>
                     );
@@ -519,6 +614,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                     <button
                       key={opt.id}
                       type="button"
+                      data-testid={`setup-mode-${opt.id}`}
                       onClick={() => setCurriculumMode(opt.id)}
                       className={`w-full rounded-2xl border-2 px-3 sm:px-4 py-2 text-left transition-all ${
                         selected
@@ -542,72 +638,35 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2.5 border-t-2 border-[#E6D7B9] pt-3">
+            {/* Clean 2-Button Bottom Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-t-2 border-[#E6D7B9] pt-3">
               <button
                 type="button"
                 data-start="true"
+                data-testid="lobby-solo-btn"
                 onClick={() => {
                   if (validateName()) setShowSoloSetup(true);
                 }}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 rounded-2xl bg-[#65C438] hover:bg-[#57B12C] border-2 border-white shadow-[0_5px_0_#3D821E] active:translate-y-0.5 active:shadow-[0_2px_0_#3D821E] text-white font-extrabold text-sm sm:text-base transition-all whitespace-nowrap"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#65C438] hover:bg-[#57B12C] border-2 border-white shadow-[0_5px_0_#3D821E] active:translate-y-0.5 active:shadow-[0_2px_0_#3D821E] text-white font-extrabold text-sm sm:text-base transition-all whitespace-nowrap cursor-pointer"
               >
-                <Bot className="h-5 w-5" />
+                <Bot className="h-5 w-5 shrink-0" />
                 <span>เล่นคนเดียวกับบอท (Solo vs Bot)</span>
               </button>
 
-              <div className="rounded-2xl border-2 border-[#E6D7B9] bg-[#FFFDF7] p-2.5 sm:p-3 space-y-2">
-                {!isFirebaseConfigured && (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p>กรุณาตั้งค่า Firebase Realtime Database ใน src/firebaseConfig.ts</p>
-                  </div>
-                )}
-
-                {onlineError && (
-                  <p className="rounded-xl border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700">
-                    {onlineError}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (validateName()) onCreateOnlineRoom();
-                    }}
-                    className="sm:col-span-5 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl sm:rounded-2xl bg-[#38BDF8] hover:bg-sky-400 border-2 border-white shadow-[0_3px_0_#0284C7] active:translate-y-0.5 text-white font-extrabold text-xs sm:text-sm transition-all whitespace-nowrap"
-                  >
-                    <Globe className="h-4 w-4" />
-                    <span>สร้างห้องออนไลน์</span>
-                  </button>
-
-                  <div className="sm:col-span-7 flex items-center gap-1.5 sm:gap-2">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={joinCode}
-                      onChange={(e) => {
-                        const next = e.target.value.toUpperCase();
-                        setJoinCode(next);
-                        onCheckJoinRoomColors(next);
-                      }}
-                      placeholder="รหัสห้อง 6 หลัก"
-                      aria-label="รหัสห้อง 6 หลัก"
-                      className="flex-1 min-w-0 rounded-xl sm:rounded-2xl border-2 border-[#E6D7B9] bg-white px-2.5 py-2 text-xs sm:text-sm font-mono-num font-bold uppercase tracking-wider text-slate-900 placeholder-slate-400 focus:border-sky-400 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (validateName()) onJoinOnlineRoom(joinCode.trim().toUpperCase());
-                      }}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl sm:rounded-2xl border-2 border-[#E6D7B9] border-b-4 bg-[#FAF6EE] hover:bg-amber-50 text-slate-800 font-extrabold text-xs sm:text-sm transition-colors whitespace-nowrap shrink-0"
-                    >
-                      <LogIn className="h-3.5 w-3.5 text-sky-600" />
-                      <span>เข้าร่วมห้อง</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <button
+                type="button"
+                data-testid="lobby-online-btn"
+                onClick={() => {
+                  if (validateName()) {
+                    onClearOnlineError();
+                    setShowOnlineModal(true);
+                  }
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#38BDF8] hover:bg-sky-400 border-2 border-white shadow-[0_5px_0_#0284C7] active:translate-y-0.5 active:shadow-[0_2px_0_#0284C7] text-white font-extrabold text-sm sm:text-base transition-all whitespace-nowrap cursor-pointer"
+              >
+                <Globe className="h-5 w-5 shrink-0" />
+                <span>เล่นออนไลน์กับเพื่อน</span>
+              </button>
             </div>
           </motion.div>
         )}
@@ -771,9 +830,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </div>
                 <button
                   type="button"
+                  data-testid="lobby-credits-close-btn"
                   onClick={() => setShowCredits(false)}
                   aria-label="ปิดหน้าต่างเครดิต"
-                  className="p-1.5 rounded-xl border-2 border-[#E6D7B9] bg-white hover:bg-amber-50 text-slate-600"
+                  className="p-1.5 rounded-xl border-2 border-[#E6D7B9] bg-white hover:bg-amber-50 text-slate-600 cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -790,16 +850,117 @@ export const Lobby: React.FC<LobbyProps> = ({
                   <span>ม6/4 เลขที่9</span>
                 </div>
               </div>
-
-              <div className="flex justify-end pt-1">
+            </motion.div>
+          </div>
+        )}
+        {showOnlineModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4"
+            onClick={() => setShowOnlineModal(false)}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="online-modal-title"
+              data-testid="online-multiplayer-modal"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md max-h-[90dvh] overflow-y-auto custom-scrollbar rounded-3xl border-4 border-[#F5C542] border-b-[8px] border-b-[#D49B1A] bg-[#FAF6EE] p-5 sm:p-6 shadow-2xl space-y-4 text-slate-800"
+            >
+              <div className="flex items-center justify-between gap-3 border-b-2 border-[#E6D7B9] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 border-2 border-sky-300 text-sky-600">
+                    <Globe className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 id="online-modal-title" className="text-lg font-extrabold text-slate-900">
+                      เล่นออนไลน์กับเพื่อน
+                    </h2>
+                    <p className="text-xs font-semibold text-amber-700">
+                      สร้างห้องใหม่หรือเข้าร่วมด้วยรหัส 6 หลัก
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
-                  data-testid="lobby-credits-close-btn"
-                  onClick={() => setShowCredits(false)}
-                  className="px-5 py-2 rounded-2xl bg-[#38BDF8] hover:bg-sky-400 border-2 border-white shadow-[0_4px_0_#0284C7] active:translate-y-0.5 text-white font-extrabold text-sm transition-all"
+                  data-testid="online-modal-close-btn"
+                  onClick={() => setShowOnlineModal(false)}
+                  aria-label="ปิดหน้าต่างเล่นออนไลน์"
+                  className="p-1.5 rounded-xl border-2 border-[#E6D7B9] bg-white hover:bg-amber-50 text-slate-600 cursor-pointer"
                 >
-                  ปิดหน้าต่าง
+                  <X className="h-4 w-4" />
                 </button>
+              </div>
+
+              {!isFirebaseConfigured && (
+                <div className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p>กรุณาตั้งค่า Firebase Realtime Database ใน src/firebaseConfig.ts</p>
+                </div>
+              )}
+
+              {onlineError && (
+                <p className="rounded-2xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                  {onlineError}
+                </p>
+              )}
+
+              <div className="rounded-2xl bg-[#FFFDF7] border-2 border-[#E6D7B9] p-4 space-y-2.5">
+                <p className="text-xs font-extrabold text-slate-700">
+                  สำหรับหัวหน้าห้อง (Host)
+                </p>
+                <button
+                  type="button"
+                  data-testid="online-create-btn"
+                  onClick={() => {
+                    if (validateName()) onCreateOnlineRoom();
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#38BDF8] hover:bg-sky-400 border-2 border-white shadow-[0_4px_0_#0284C7] active:translate-y-0.5 text-white font-extrabold text-sm transition-all cursor-pointer"
+                >
+                  <Globe className="h-4 w-4" />
+                  <span>สร้างห้องออนไลน์ใหม่</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                <span className="h-px flex-1 bg-[#E6D7B9]" />
+                <span>หรือ</span>
+                <span className="h-px flex-1 bg-[#E6D7B9]" />
+              </div>
+
+              <div className="rounded-2xl bg-[#FFFDF7] border-2 border-[#E6D7B9] p-4 space-y-2.5">
+                <p className="text-xs font-extrabold text-slate-700">
+                  สำหรับเพื่อนที่ได้รับรหัสห้อง 6 หลัก
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    data-testid="online-join-input"
+                    value={joinCode}
+                    onChange={(e) => {
+                      const next = e.target.value.toUpperCase();
+                      setJoinCode(next);
+                      onCheckJoinRoomColors(next);
+                    }}
+                    placeholder="กรอกรหัส 6 หลัก"
+                    aria-label="กรอกรหัสห้อง 6 หลัก"
+                    className="flex-1 min-w-0 rounded-2xl border-2 border-[#E6D7B9] bg-white px-3 py-2.5 text-sm font-mono-num font-bold uppercase tracking-widest text-slate-900 placeholder-slate-400 focus:border-sky-400 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    data-testid="online-join-btn"
+                    onClick={() => {
+                      if (validateName()) onJoinOnlineRoom(joinCode.trim().toUpperCase());
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#65C438] hover:bg-[#57B12C] border-2 border-white shadow-[0_4px_0_#3D821E] active:translate-y-0.5 text-white font-extrabold text-sm transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    <span>เข้าร่วมห้อง</span>
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
